@@ -1,0 +1,48 @@
+// =====================================================================
+//  CONFIGURAÇÃO DO APP — Projeto Uniforça
+//  Edite este arquivo para mudar desafios, prêmios, datas e administradores.
+// =====================================================================
+
+// 1) FIREBASE (banco de dados online, plano gratuito)
+//    Enquanto estiver vazio, o app roda em MODO DEMONSTRAÇÃO:
+//    os dados ficam salvos só no aparelho que está usando.
+//    Veja o README.md para o passo a passo de como preencher.
+export const FIREBASE_CONFIG = {
+  apiKey: "",
+  authDomain: "",
+  projectId: "",
+  appId: "",
+};
+
+// 2) ADMINISTRADORES — usuários que entram no painel de acompanhamento.
+//    (Se usar o Firebase, repita os mesmos nomes no arquivo firestore.rules.)
+export const ADMINS = ["lucas"];
+
+// 3) PERÍODO DO RALLY — só contam pontos feitos entre estas datas (AAAA-MM-DD).
+export const RALLY = {
+  inicio: "2026-01-01",
+  fim: "2026-12-31",
+};
+
+// 4) DESAFIOS — cada um pode ser marcado 1 vez por dia.
+//    Os ids e pontos também estão no firestore.rules; mude nos dois lugares.
+export const DESAFIOS = [
+  { id: "meditacao-palavra", titulo: "Meditação da Palavra", pontos: 50, icone: "livro" },
+  { id: "meditacao-bispo", titulo: "Meditação do Bispo", pontos: 50, icone: "play" },
+  { id: "assistir-univer", titulo: "Assistir Univer", pontos: 50, icone: "tv" },
+  { id: "livro-da-fe", titulo: "Livro da Fé", pontos: 50, icone: "livro" },
+  { id: "trouxe-alma", titulo: "Trouxe alma em qualquer reunião", pontos: 200, icone: "pessoas" },
+  { id: "limpou-igreja", titulo: "Limpou uma parte crítica da igreja", pontos: 100, icone: "vassoura" },
+  { id: "fez-em-casa", titulo: "Fez alguma coisa em casa", pontos: 80, icone: "casa" },
+  { id: "codigo-q", titulo: "Código Q", pontos: 30, icone: "radio" },
+];
+
+// 5) PRÊMIOS — texto livre, mude quando decidirem.
+export const PREMIOS = {
+  individuais: [
+    { lugar: 1, premio: "Rodízio + Arca Center" },
+    { lugar: 2, premio: "Arca Center" },
+    { lugar: 3, premio: "Livro da Fé" },
+  ],
+  projeto: "Necessidade do projeto ou os integrantes saírem para algum lugar.",
+};
