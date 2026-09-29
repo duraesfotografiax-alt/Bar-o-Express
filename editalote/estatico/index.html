@@ -72,6 +72,12 @@
   .barra { height: 8px; background: var(--borda); border-radius: 4px; overflow: hidden; margin: 8px 0; }
   .barra div { height: 100%; width: 0; background: var(--destaque); transition: width .3s; }
   .erro { color: var(--erro); }
+  h3 { font-size: 12px; color: var(--suave); margin: 14px 0 6px; font-weight: 600; }
+  #curva { width: 100%; max-width: 348px; aspect-ratio: 1; background: var(--painel);
+           border: 1px solid var(--borda); border-radius: 6px; touch-action: none; cursor: crosshair; display: block; }
+  .canais { display: flex; gap: 4px; margin-bottom: 6px; }
+  .canais button { padding: 3px 10px; font-size: 12px; }
+  .canais button.ativo { border-color: var(--destaque); color: var(--destaque); }
   .ok { color: var(--ok); }
   @media (max-width: 800px) {
     main { grid-template-columns: 1fr; height: auto; }
@@ -107,7 +113,23 @@
       <h2>3. Padrão de edição</h2>
       <div class="linha"><select id="preset" onchange="usarPreset()"></select>
         <button onclick="salvarPreset()" title="Salvar os ajustes atuais como um novo preset">Salvar</button></div>
+      <div class="linha" style="margin-top:6px; flex-wrap: wrap">
+        <button onclick="importarLR('arquivo')" title="Preset .xmp ou uma foto editada no Lightroom">Importar do Lightroom</button>
+        <button onclick="importarLR('pasta')" title="Lê as edições de todas as fotos de um evento já editado e tira o padrão médio">Aprender de um evento</button>
+      </div>
+      <p id="lrMsg" class="dica"></p>
       <div id="sliders"></div>
+      <h3>Curvas</h3>
+      <div id="slidersCurva"></div>
+      <div class="canais" style="margin-top:8px">
+        <button data-canal="curva" class="ativo" onclick="escolherCanal(this)">RGB</button>
+        <button data-canal="curva_r" onclick="escolherCanal(this)" style="color:#e06c6c">R</button>
+        <button data-canal="curva_g" onclick="escolherCanal(this)" style="color:#6cc18a">G</button>
+        <button data-canal="curva_b" onclick="escolherCanal(this)" style="color:#6c9be0">B</button>
+        <button onclick="zerarCurva()" style="margin-left:auto">Zerar curva</button>
+      </div>
+      <canvas id="curva" width="512" height="512"></canvas>
+      <p class="dica">Clique para criar um ponto e arraste. Dois cliques num ponto apagam o ponto.</p>
       <label>LUT criativa (.cube) — opcional</label>
       <div class="linha"><input type="text" id="lut" placeholder="nenhuma" onchange="mudou()">
         <button onclick="escolher('lut')">Procurar</button></div>
@@ -168,12 +190,24 @@ const CONTROLES = [
   ["nitidez", "Nitidez", 0, 100, 1],
   ["lut_intensidade", "Força da LUT", 0, 100, 1],
 ];
+const CONTROLES_CURVA = [
+  ["curva_realces", "Realces", -100, 100, 1],
+  ["curva_claros", "Claros", -100, 100, 1],
+  ["curva_escuros", "Escuros", -100, 100, 1],
+  ["curva_sombras", "Sombras", -100, 100, 1],
+];
+const TODOS_CONTROLES = [...CONTROLES, ...CONTROLES_CURVA];
+let padroes = {};
 let ajustes = {}, presets = [], cameras = [], fotoAtual = null, timer = null, poll = null;
 const $ = id => document.getElementById(id);
 const esc = t => String(t ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
 
 function montarSliders() {
-  $("sliders").innerHTML = CONTROLES.map(([k, nome, min, max, passo, dica]) => `
+  $("sliders").innerHTML = htmlSliders(CONTROLES);
+  $("slidersCurva").innerHTML = htmlSliders(CONTROLES_CURVA);
+}
+function htmlSliders(lista) {
+  return lista.map(([k, nome, min, max, passo, dica]) => `
     <div class="slider" title="${dica || ""}"><span>${nome}</span>
       <input type="range" id="s_${k}" min="${min}" max="${max}" step="${passo}"
         oninput="ajustes['${k}']=+this.value; $('o_${k}').value=this.value; mudou()"
@@ -181,11 +215,12 @@ function montarSliders() {
       <output id="o_${k}"></output></div>`).join("");
 }
 function mostrarAjustes() {
-  for (const [k] of CONTROLES) {
+  for (const [k] of TODOS_CONTROLES) {
     const v = ajustes[k] ?? 0;
     $("s_" + k).value = v; $("o_" + k).value = v;
   }
   $("lut").value = ajustes.lut || "";
+  desenharCurva();
 }
 function resetar(k) { ajustes[k] = (k === "lut_intensidade") ? 100 : 0; mostrarAjustes(); mudou(); }
 
@@ -207,7 +242,7 @@ async function carregarPresets(selecionar) {
 function usarPreset() {
   const p = presets[$("preset").value] || {};
   const cams = ajustes.cameras || {};
-  ajustes = {lut_intensidade: 100, ...structuredClone(p), cameras: cams};
+  ajustes = {...structuredClone(padroes), ...structuredClone(p), cameras: cams};
   delete ajustes.arquivo;
   mostrarAjustes(); mudou();
 }
@@ -217,6 +252,109 @@ async function salvarPreset() {
   const r = await api("/api/presets", {...ajustes, nome});
   await carregarPresets(r.arquivo);
 }
+
+async function importarLR(tipo) {
+  const r = await api("/api/escolher", {tipo: tipo === "pasta" ? "pasta" : "lightroom"});
+  if (r.erro) alert(r.erro);
+  if (!r.caminho) return;
+  $("lrMsg").textContent = "Lendo as edições do Lightroom…";
+  try {
+    const res = await api("/api/lightroom", {caminho: r.caminho});
+    const cams = ajustes.cameras || {};
+    ajustes = {...structuredClone(padroes), ...res.ajustes, cameras: cams,
+               nome: tipo === "pasta" ? "Padrão aprendido do Lightroom" : "Importado do Lightroom"};
+    mostrarAjustes(); mudou();
+    let txt = res.fotos > 1 ? `Padrão tirado de ${res.fotos} fotos editadas.` : "Ajustes importados.";
+    if (res.ignorados.length) txt += ` Ainda não suportado (ignorado): ${res.ignorados.join(", ")}.`;
+    txt += " Clique em Salvar para guardar como preset.";
+    $("lrMsg").textContent = txt;
+  } catch (e) { $("lrMsg").innerHTML = `<span class="erro">${esc(e.message)}</span>`; }
+}
+
+// ---------------------------------------------------------------- curva
+let canalCurva = "curva", arrastoCurva = -1;
+const CORES_CANAL = {curva: "#e7e7e9", curva_r: "#e06c6c", curva_g: "#6cc18a", curva_b: "#6c9be0"};
+function pontosDe(canal) { return ajustes[canal] ? ajustes[canal].map(p => [...p]) : [[0, 0], [255, 255]]; }
+function pchip(pontos, x) {
+  const xs = pontos.map(p => p[0]), ys = pontos.map(p => p[1]), n = xs.length;
+  const h = [], d = [];
+  for (let k = 0; k < n - 1; k++) { h.push(xs[k + 1] - xs[k]); d.push((ys[k + 1] - ys[k]) / h[k]); }
+  const m = [d[0]];
+  for (let k = 1; k < n - 1; k++) {
+    if (d[k - 1] * d[k] <= 0) m.push(0);
+    else { const w1 = 2 * h[k] + h[k - 1], w2 = h[k] + 2 * h[k - 1]; m.push((w1 + w2) / (w1 / d[k - 1] + w2 / d[k])); }
+  }
+  m.push(d[n - 2]);
+  x = Math.min(Math.max(x, xs[0]), xs[n - 1]);
+  let i = 0; while (i < n - 2 && x >= xs[i + 1]) i++;
+  const t = (x - xs[i]) / h[i], t2 = t * t, t3 = t2 * t;
+  const y = (2*t3 - 3*t2 + 1) * ys[i] + (t3 - 2*t2 + t) * h[i] * m[i] + (-2*t3 + 3*t2) * ys[i + 1] + (t3 - t2) * h[i] * m[i + 1];
+  return Math.min(255, Math.max(0, y));
+}
+function desenharCurva() {
+  const c = $("curva"), g = c.getContext("2d"), W = c.width, E = W / 255;
+  g.clearRect(0, 0, W, W);
+  g.strokeStyle = "#2c2f33"; g.lineWidth = 1;
+  for (let i = 1; i < 4; i++) { const p = i * W / 4; g.beginPath(); g.moveTo(p, 0); g.lineTo(p, W); g.moveTo(0, p); g.lineTo(W, p); g.stroke(); }
+  g.setLineDash([4, 4]); g.beginPath(); g.moveTo(0, W); g.lineTo(W, 0); g.stroke(); g.setLineDash([]);
+  for (const canal of ["curva", "curva_r", "curva_g", "curva_b"]) {
+    if (canal !== canalCurva && !ajustes[canal]) continue;
+    const pts = pontosDe(canal);
+    g.strokeStyle = CORES_CANAL[canal]; g.globalAlpha = canal === canalCurva ? 1 : 0.35; g.lineWidth = 3;
+    g.beginPath();
+    for (let x = 0; x <= 255; x++) { const y = pchip(pts, x); x ? g.lineTo(x * E, W - y * E) : g.moveTo(0, W - y * E); }
+    g.stroke();
+  }
+  g.globalAlpha = 1;
+  g.fillStyle = CORES_CANAL[canalCurva];
+  for (const [x, y] of pontosDe(canalCurva)) { g.beginPath(); g.arc(x * E, W - y * E, 8, 0, 7); g.fill(); }
+}
+function posCurva(e) {
+  const r = $("curva").getBoundingClientRect();
+  return [Math.round(Math.min(255, Math.max(0, (e.clientX - r.left) / r.width * 255))),
+          Math.round(Math.min(255, Math.max(0, 255 - (e.clientY - r.top) / r.height * 255)))];
+}
+function salvarPontos(pts) {
+  const identidade = pts.length === 2 && pts[0][0] === 0 && pts[0][1] === 0 && pts[1][0] === 255 && pts[1][1] === 255;
+  ajustes[canalCurva] = identidade ? null : pts;
+  desenharCurva(); mudou();
+}
+function pontoProximo(pts, [x, y]) {
+  let melhor = -1, dist = 12;
+  pts.forEach(([px, py], i) => { const d = Math.hypot(px - x, py - y); if (d < dist) { dist = d; melhor = i; } });
+  return melhor;
+}
+function ligarCurva() {
+  const c = $("curva");
+  c.addEventListener("pointerdown", e => {
+    c.setPointerCapture(e.pointerId);
+    const p = posCurva(e), pts = pontosDe(canalCurva);
+    let i = pontoProximo(pts, p);
+    if (i < 0) {
+      if (p[0] <= pts[0][0] || p[0] >= pts[pts.length - 1][0]) return;
+      pts.push(p); pts.sort((a, b) => a[0] - b[0]); i = pts.findIndex(q => q === p);
+      salvarPontos(pts);
+    }
+    arrastoCurva = i;
+  });
+  c.addEventListener("pointermove", e => {
+    if (arrastoCurva < 0) return;
+    const pts = pontosDe(canalCurva), i = arrastoCurva, [x, y] = posCurva(e);
+    const min = i === 0 ? 0 : pts[i - 1][0] + 1, max = i === pts.length - 1 ? 255 : pts[i + 1][0] - 1;
+    pts[i] = [Math.min(max, Math.max(min, x)), y];
+    salvarPontos(pts);
+  });
+  c.addEventListener("pointerup", () => arrastoCurva = -1);
+  c.addEventListener("dblclick", e => {
+    const pts = pontosDe(canalCurva), i = pontoProximo(pts, posCurva(e));
+    if (i > 0 && i < pts.length - 1) { pts.splice(i, 1); salvarPontos(pts); }
+  });
+}
+function escolherCanal(btn) {
+  document.querySelectorAll(".canais button[data-canal]").forEach(b => b.classList.toggle("ativo", b === btn));
+  canalCurva = btn.dataset.canal; desenharCurva();
+}
+function zerarCurva() { ajustes[canalCurva] = null; desenharCurva(); mudou(); }
 
 async function escolher(campo) {
   const r = await api("/api/escolher", {tipo: campo === "lut" ? "lut" : "pasta"});
@@ -395,7 +533,8 @@ function fecharProgresso() { $("progresso").style.display = "none"; }
 async function abrirSaida() { await api("/api/abrir-pasta", {pasta: $("saida").value.trim()}); }
 
 montarSliders();
-carregarPresets();
+ligarCurva();
+api("/api/padroes").then(r => { padroes = r.ajustes; carregarPresets(); });
 </script>
 </body>
 </html>

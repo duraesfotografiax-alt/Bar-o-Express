@@ -14,6 +14,7 @@ import webbrowser
 from flask import Flask, abort, jsonify, request, send_file, send_from_directory
 from PIL import Image
 
+from .lightroom import aprender
 from .lote import OPCOES_PADRAO, Trabalho, resumo_pasta
 from .metadados import EXTENSOES
 from .processamento import AJUSTES_PADRAO, previa_jpeg
@@ -47,10 +48,14 @@ def padroes():
 def escolher():
     """Abre a janela nativa de escolher pasta/arquivo (num processo à parte)."""
     tipo = (request.json or {}).get("tipo", "pasta")
-    if tipo == "lut":
+    filtros = {
+        "lut": "[('LUT', '*.cube')]",
+        "lightroom": "[('Preset ou foto do Lightroom', '*.xmp *.jpg *.jpeg *.JPG *.JPEG')]",
+    }
+    if tipo in filtros:
         codigo = ("import tkinter as t, tkinter.filedialog as f; r=t.Tk(); r.withdraw(); "
                   "r.attributes('-topmost', True); "
-                  "print(f.askopenfilename(filetypes=[('LUT', '*.cube')]) or '')")
+                  f"print(f.askopenfilename(filetypes={filtros[tipo]}) or '')")
     else:
         codigo = ("import tkinter as t, tkinter.filedialog as f; r=t.Tk(); r.withdraw(); "
                   "r.attributes('-topmost', True); print(f.askdirectory() or '')")
@@ -60,6 +65,17 @@ def escolher():
         return jsonify({"caminho": os.path.normpath(saida.stdout.strip()) if saida.stdout.strip() else ""})
     except Exception as erro:
         return jsonify({"caminho": "", "erro": f"Não consegui abrir a janela ({erro}). Digite o caminho."})
+
+
+@app.post("/api/lightroom")
+def importar_lightroom():
+    caminho = (request.json or {}).get("caminho", "")
+    if not os.path.exists(caminho):
+        return jsonify({"erro": "Arquivo ou pasta não encontrado"}), 400
+    try:
+        return jsonify(aprender(caminho))
+    except ValueError as erro:
+        return jsonify({"erro": str(erro)}), 400
 
 
 @app.post("/api/escanear")

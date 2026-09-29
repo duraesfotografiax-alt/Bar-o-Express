@@ -37,6 +37,16 @@ AJUSTES_PADRAO: dict = {
     "saturacao": 0,              # -100..100
     "vibracao": 0,               # -100..100 (protege cores já saturadas)
     "nitidez": 0,                # 0..100
+    # Curva por regiões (igual à curva paramétrica do Lightroom), -100..100
+    "curva_sombras": 0,
+    "curva_escuros": 0,
+    "curva_claros": 0,
+    "curva_realces": 0,
+    # Curva de pontos (igual à do Lightroom): [[x, y], ...] em 0..255, ou None
+    "curva": None,
+    "curva_r": None,
+    "curva_g": None,
+    "curva_b": None,
     "lut": None,                 # caminho de arquivo .cube
     "lut_intensidade": 100,      # 0..100
     "cameras": {},               # ajustes finos por câmera (ver ajustes_para_camera)
@@ -45,10 +55,13 @@ AJUSTES_PADRAO: dict = {
 CAMPOS_POR_CAMERA = ("exposicao", "temperatura", "matiz", "saturacao")
 
 
+CAMPOS_ANULAVEIS = ("lut", "curva", "curva_r", "curva_g", "curva_b")
+
+
 def completar_ajustes(ajustes: dict | None) -> dict:
     final = dict(AJUSTES_PADRAO)
     if ajustes:
-        final.update({k: v for k, v in ajustes.items() if v is not None or k == "lut"})
+        final.update({k: v for k, v in ajustes.items() if v is not None or k in CAMPOS_ANULAVEIS})
     return final
 
 
@@ -79,6 +92,53 @@ def linear_para_srgb(v: np.ndarray) -> np.ndarray:
 def _suave(a: float, b: float, v: np.ndarray) -> np.ndarray:
     t = np.clip((v - a) / (b - a), 0.0, 1.0)
     return t * t * (3 - 2 * t)
+
+
+# ------------------------------------------------------------------- curvas
+
+def avaliar_curva(pontos, x: np.ndarray) -> np.ndarray:
+    """Curva monotônica suave (PCHIP) pelos pontos [[x, y], ...] em 0..255."""
+    pts = sorted((float(px), float(py)) for px, py in pontos)
+    xs, ys = [], []
+    for px, py in pts:
+        px = min(max(px, 0.0), 255.0) / 255.0
+        py = min(max(py, 0.0), 255.0) / 255.0
+        if xs and px - xs[-1] < 1e-6:
+            ys[-1] = py
+        else:
+            xs.append(px)
+            ys.append(py)
+    if len(xs) < 2:
+        return x
+    xs_a, ys_a = np.array(xs), np.array(ys)
+    h = np.diff(xs_a)
+    d = np.diff(ys_a) / h
+    m = np.empty(len(xs_a))
+    m[0], m[-1] = d[0], d[-1]
+    for k in range(1, len(xs_a) - 1):
+        if d[k - 1] * d[k] <= 0:
+            m[k] = 0.0
+        else:
+            w1, w2 = 2 * h[k] + h[k - 1], h[k] + 2 * h[k - 1]
+            m[k] = (w1 + w2) / (w1 / d[k - 1] + w2 / d[k])
+    xc = np.clip(x, xs_a[0], xs_a[-1])
+    i = np.clip(np.searchsorted(xs_a, xc, side="right") - 1, 0, len(xs_a) - 2)
+    t = (xc - xs_a[i]) / h[i]
+    t2, t3 = t * t, t * t * t
+    y = ((2 * t3 - 3 * t2 + 1) * ys_a[i] + (t3 - 2 * t2 + t) * h[i] * m[i]
+         + (-2 * t3 + 3 * t2) * ys_a[i + 1] + (t3 - t2) * h[i] * m[i + 1])
+    # fora dos pontos extremos a curva fica plana (como no Lightroom)
+    return np.clip(y, 0.0, 1.0)
+
+
+def _curva_regioes(a: dict) -> list | None:
+    valores = [float(a.get(k, 0) or 0) / 100.0 for k in
+               ("curva_sombras", "curva_escuros", "curva_claros", "curva_realces")]
+    if not any(valores):
+        return None
+    xs = (0.125, 0.375, 0.625, 0.875)
+    pontos = [[0, 0]] + [[x * 255, (x + 0.12 * v) * 255] for x, v in zip(xs, valores)] + [[255, 255]]
+    return pontos
 
 
 # ---------------------------------------------------------- análise automática
@@ -219,6 +279,17 @@ def transformar(rgb: np.ndarray, ajustes: dict, analise: Analise | None,
     elif brancos > 0:
         v = np.clip(v / (1 - 0.06 * brancos), 0.0, 1.0)
     v = np.clip(v, 0.0, 1.0)
+
+    # 3b) curvas: primeiro por regiões, depois a de pontos (mesma ordem do Lightroom)
+    regioes = _curva_regioes(a)
+    if regioes:
+        v = avaliar_curva(regioes, v)
+    if a.get("curva"):
+        v = avaliar_curva(a["curva"], v)
+    for canal, chave in enumerate(("curva_r", "curva_g", "curva_b")):
+        if a.get(chave):
+            v = v.copy()
+            v[..., canal] = avaliar_curva(a[chave], v[..., canal])
 
     # 4) saturação e vibração
     saturacao = float(a.get("saturacao", 0)) / 100.0

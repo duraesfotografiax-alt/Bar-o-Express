@@ -14,12 +14,36 @@ subir nada para a internet. Tudo roda no seu computador.
 4. **Iguala exposição e balanço de branco** de foto para foto (auto exposição/auto balanço, com força
    ajustável). Fotos que já estão boas ficam como estão.
 5. **Aplica o padrão do estúdio**: exposição, contraste, realces, sombras, brancos, pretos, temperatura,
-   matiz, saturação, vibração, nitidez e **LUT .cube** opcional.
+   matiz, saturação, vibração, nitidez, **curvas** e **LUT .cube** opcional.
+   Também dá para **importar o padrão do Lightroom** (veja abaixo).
 6. **Ajuste fino por câmera** para a Sony e a Canon ficarem com a mesma cor.
 7. **Separa as fotos possivelmente desfocadas** na pasta `_revisar_desfocadas`, comparando cada
    foto com as outras da mesma câmera.
 8. **Exporta renomeado** (`Casamento_Ana_Joao_0001.jpg`…), com versão leve opcional para
    WhatsApp/Instagram (pasta `web`), e um `relatorio.csv` que abre no Excel.
+
+## Vindo do Lightroom
+
+O EditaLote tem as ferramentas que vocês mais usam no Lightroom: exposição, contraste, realces,
+sombras, brancos, pretos, temperatura, matiz, vibração, saturação e **curvas** (a de pontos, com
+R/G/B separados, e a curva por regiões: realces, claros, escuros e sombras). O botão **Auto** do
+Lightroom corresponde a **Auto exposição / Auto balanço**.
+
+Em vez de montar o padrão do zero, vocês podem trazer o que já fazem no Lightroom:
+
+- **Importar do Lightroom**: escolha um preset `.xmp` (no Lightroom Classic, botão direito no
+  preset > *Exportar*) ou uma foto que vocês já editaram.
+- **Aprender de um evento**: escolha a pasta de um casamento que vocês já editaram foto por foto.
+  O EditaLote lê a edição de cada foto e usa a **mediana** (o "meio-termo") como padrão. Uma foto
+  muito diferente das outras não bagunça o resultado.
+  - Para a edição ficar gravada nas fotos: no Lightroom Classic, selecione todas as fotos do evento
+    e use **Metadados > Salvar metadados no arquivo** (Ctrl+S). Nos JPEGs a edição é gravada dentro
+    do próprio arquivo.
+
+Depois de importar, confira no antes/depois e clique em **Salvar** para virar um preset.
+
+O que **ainda não** é importado (o EditaLote avisa quando encontra): Claridade, Textura, Remover
+névoa, HSL/Cor, Gradação de cor, Vinheta, Granulação, Redução de ruído e máscaras/ajustes locais.
 
 ## Qualidade
 
@@ -77,6 +101,7 @@ Estrutura:
 | `editalote/processamento.py` | análise automática e todos os ajustes de cor (LUT 3D) |
 | `editalote/lut_cube.py` | leitura de LUTs `.cube` |
 | `editalote/metadados.py` | EXIF: câmera, número de série, horário |
+| `editalote/lightroom.py` | importa presets `.xmp` e edições salvas nas fotos |
 | `editalote/lote.py` | ordem por horário, renomeação, processamento paralelo, desfocadas, relatório |
 | `editalote/servidor.py` | servidor local (só `127.0.0.1`) |
 | `editalote/estatico/index.html` | tela |
@@ -84,6 +109,7 @@ Estrutura:
 
 ## Próximos passos sugeridos
 
+- HSL (ajuste por cor, por exemplo tom de pele e verde da grama) e Claridade.
 - Detectar **olhos fechados** e **fotos repetidas** (rajadas) para a triagem.
 - **Galeria online** para o cliente escolher as fotos do álbum.
 - **Marca d'água** opcional na versão web.
