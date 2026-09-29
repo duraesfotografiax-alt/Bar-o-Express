@@ -56,16 +56,30 @@ névoa, HSL/Cor, Gradação de cor, Vinheta, Granulação, Redução de ruído e
 
 ## Como usar (Windows)
 
+### Jeito mais fácil: EditaLote.exe (não precisa instalar nada)
+
+1. No GitHub, abra a aba **Actions** > o último **"Windows (testes e EditaLote.exe)"** com ✅ >
+   em **Artifacts**, baixe **EditaLote-Windows**.
+2. Extraia o .zip numa pasta (ex.: `C:\EditaLote`).
+3. Dê dois cliques em **`EditaLote.exe`**. Uma janela preta abre (deixe aberta) e o navegador abre
+   com a tela do programa.
+   - Se o Windows mostrar "O Windows protegeu o computador", clique em **Mais informações >
+     Executar assim mesmo** (o programa não tem assinatura digital paga).
+   - Dica: botão direito no `EditaLote.exe` > **Enviar para > Área de trabalho (criar atalho)**.
+
+### Com Python instalado
+
 1. Instale o Python: <https://www.python.org/downloads/> e **marque "Add Python to PATH"**.
-2. Baixe esta pasta e dê dois cliques em **`iniciar.bat`**. Na primeira vez ele instala o que precisa
-   (1–2 minutos).
-3. O navegador abre sozinho com a tela do EditaLote:
-   - **Procurar** a pasta das fotos, depois **Carregar fotos**;
-   - Clique nas miniaturas e arraste a barra para comparar **antes × depois**;
-   - Escolha um preset (Natural, Casamento Quente, Claro e Leve, Marketing/Carros) e ajuste;
-     **Salvar** cria o seu próprio padrão (fica na pasta `presets`);
-   - Se houver mais de uma câmera, acerte o **horário** e a cor de cada uma;
-   - **Editar todas as fotos**.
+2. Dê dois cliques em **`iniciar.bat`**. Na primeira vez ele instala o que precisa (1–2 minutos).
+
+### Usando a tela
+
+- **Procurar** a pasta das fotos, depois **Carregar fotos**;
+- Clique nas miniaturas e arraste a barra para comparar **antes × depois**;
+- Escolha um preset (Natural, Casamento Quente, Claro e Leve, Marketing/Carros), importe do
+  Lightroom, ou ajuste à mão; **Salvar** cria o seu próprio padrão (fica na pasta `presets`);
+- Se houver mais de uma câmera, acerte o **horário** e a cor de cada uma;
+- **Editar todas as fotos**.
 
 No Mac/Linux use `./iniciar.sh`.
 
