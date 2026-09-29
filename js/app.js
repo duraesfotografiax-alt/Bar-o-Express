@@ -484,7 +484,7 @@ $app.addEventListener("click", async (e) => {
     return telaLogin();
   }
   if (acao === "sair") {
-    if (await abrirFolha({ icone: "sair", titulo: "Sair da conta?", texto: "Você pode entrar de novo quando quiser.", confirmar: "Sair" })) store.sair();
+    if (await abrirFolha({ icone: "sair", titulo: "Sair da conta?", texto: "Você pode entrar de novo quando quiser.", confirmar: "Sair" })) { estado.modoCadastro = false; store.sair(); }
     return;
   }
   if (acao === "atualizar") {
