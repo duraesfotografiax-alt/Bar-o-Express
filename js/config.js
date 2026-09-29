@@ -8,10 +8,10 @@
 //    os dados ficam salvos só no aparelho que está usando.
 //    Veja o README.md para o passo a passo de como preencher.
 export const FIREBASE_CONFIG = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  appId: "",
+  apiKey: "AIzaSyCbgBRVfyb9TFAPXoNUK_xUglypGkp4N_4",
+  authDomain: "uniforca-2c3eb.firebaseapp.com",
+  projectId: "uniforca-2c3eb",
+  appId: "1:847207099413:web:485c6319c531e8b09a721c",
 };
 
 // 2) ADMINISTRADORES — usuários que entram no painel de acompanhamento.
