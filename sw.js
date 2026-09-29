@@ -1,6 +1,6 @@
 // Guarda os arquivos do app no aparelho para abrir rápido.
 // Ao mudar qualquer arquivo, aumente a versão abaixo.
-const VERSAO = "uniforca-v2";
+const VERSAO = "uniforca-v3";
 const ARQUIVOS = [
   "./", "index.html", "css/style.css", "js/app.js", "js/store.js", "js/config.js", "js/icons.js",
   "manifest.webmanifest", "assets/logo.png", "assets/icon-192.png", "assets/icon-512.png",

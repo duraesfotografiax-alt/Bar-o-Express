@@ -40,7 +40,8 @@ const nomeDia = (iso) => {
 };
 
 const valido = (r) => r.status === "ok" && r.data >= RALLY.inicio && r.data <= RALLY.fim;
-const membros = () => estado.usuarios.filter((u) => u.role !== "admin");
+// Todos participam do Rally, inclusive o administrador.
+const membros = () => estado.usuarios;
 
 function ranking() {
   const totais = new Map(membros().map((u) => [u.uid, 0]));
@@ -166,6 +167,7 @@ const ABAS_MEMBRO = [
 ];
 const ABAS_ADMIN = [
   { id: "painel", rotulo: "Painel", icone: "painel" },
+  { id: "desafios", rotulo: "Desafios", icone: "alvo" },
   { id: "integrantes", rotulo: "Integrantes", icone: "pessoas" },
   { id: "registros", rotulo: "Registros", icone: "lista" },
   { id: "premios", rotulo: "Prêmios", icone: "presente" },
