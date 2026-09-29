@@ -10,6 +10,29 @@ import threading
 import time
 
 
+FILTROS = {
+    "lut": [("LUT", "*.cube")],
+    "lightroom": [("Preset ou foto do Lightroom", "*.xmp *.jpg *.jpeg")],
+}
+
+
+def escolher_com_janela(tipo: str) -> int:
+    """Abre a janela do Windows para escolher pasta/arquivo e imprime o caminho."""
+    import tkinter
+    from tkinter import filedialog
+
+    raiz = tkinter.Tk()
+    raiz.withdraw()
+    raiz.attributes("-topmost", True)
+    if tipo in FILTROS:
+        caminho = filedialog.askopenfilename(parent=raiz, filetypes=FILTROS[tipo])
+    else:
+        caminho = filedialog.askdirectory(parent=raiz)
+    raiz.destroy()
+    sys.stdout.write((caminho or "") + "\n")
+    return 0
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="editalote", description="Edição de fotos em lote")
     sub = parser.add_subparsers(dest="comando")
@@ -25,7 +48,12 @@ def main(argv=None):
     proc.add_argument("--manter-nomes", action="store_true")
     proc.add_argument("--web", action="store_true", help="gera também versão 2048 px")
     proc.add_argument("--processos", type=int)
+    escolher = sub.add_parser("_escolher", help=argparse.SUPPRESS)
+    escolher.add_argument("tipo", choices=["pasta", "lut", "lightroom"])
     args = parser.parse_args(argv)
+
+    if args.comando == "_escolher":
+        return escolher_com_janela(args.tipo)
 
     if args.comando == "processar":
         from .lote import Trabalho

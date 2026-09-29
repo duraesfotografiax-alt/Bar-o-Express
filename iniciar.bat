@@ -1,20 +1,32 @@
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0"
-where python >nul 2>nul
-if errorlevel 1 (
+rem Prefere o lançador "py" (vem com o instalador do python.org) e evita o atalho da Microsoft Store
+set PY=
+py -3 --version >nul 2>nul && set PY=py -3
+if not defined PY (
+  python -c "import sys" >nul 2>nul && set PY=python
+)
+if not defined PY (
   echo.
-  echo  Python nao encontrado. Instale em https://www.python.org/downloads/
-  echo  IMPORTANTE: marque a opcao "Add Python to PATH" na instalacao.
+  echo  Python nao encontrado.
+  echo  Instale em https://www.python.org/downloads/ e marque "Add Python to PATH".
+  echo  Ou use o EditaLote.exe, que nao precisa de Python.
   echo.
   pause
   exit /b 1
 )
-if not exist .venv (
+if not exist .venv\Scripts\python.exe (
   echo Preparando o EditaLote pela primeira vez, aguarde...
-  python -m venv .venv
+  %PY% -m venv .venv || goto erro
   .venv\Scripts\python -m pip install --upgrade pip >nul
-  .venv\Scripts\python -m pip install -r requirements.txt
+  .venv\Scripts\python -m pip install -r requirements.txt || goto erro
 )
 .venv\Scripts\python -m editalote
 pause
+exit /b 0
+:erro
+echo.
+echo  Algo deu errado na instalacao. Apague a pasta .venv e tente de novo.
+pause
+exit /b 1

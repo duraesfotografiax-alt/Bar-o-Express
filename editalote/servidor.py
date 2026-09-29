@@ -19,9 +19,14 @@ from .lote import OPCOES_PADRAO, Trabalho, resumo_pasta
 from .metadados import EXTENSOES
 from .processamento import AJUSTES_PADRAO, previa_jpeg
 
-RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if getattr(sys, "frozen", False):
+    # EditaLote.exe: presets ficam ao lado do .exe (dá para editar e salvar novos)
+    RAIZ = os.path.dirname(sys.executable)
+    PASTA_ESTATICA = os.path.join(sys._MEIPASS, "editalote", "estatico")  # type: ignore[attr-defined]
+else:
+    RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    PASTA_ESTATICA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "estatico")
 PASTA_PRESETS = os.path.join(RAIZ, "presets")
-PASTA_ESTATICA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "estatico")
 
 app = Flask(__name__, static_folder=None)
 _trabalho: Trabalho | None = None
@@ -48,21 +53,16 @@ def padroes():
 def escolher():
     """Abre a janela nativa de escolher pasta/arquivo (num processo à parte)."""
     tipo = (request.json or {}).get("tipo", "pasta")
-    filtros = {
-        "lut": "[('LUT', '*.cube')]",
-        "lightroom": "[('Preset ou foto do Lightroom', '*.xmp *.jpg *.jpeg *.JPG *.JPEG')]",
-    }
-    if tipo in filtros:
-        codigo = ("import tkinter as t, tkinter.filedialog as f; r=t.Tk(); r.withdraw(); "
-                  "r.attributes('-topmost', True); "
-                  f"print(f.askopenfilename(filetypes={filtros[tipo]}) or '')")
+    if getattr(sys, "frozen", False):  # EditaLote.exe
+        comando = [sys.executable, "_escolher", tipo]
     else:
-        codigo = ("import tkinter as t, tkinter.filedialog as f; r=t.Tk(); r.withdraw(); "
-                  "r.attributes('-topmost', True); print(f.askdirectory() or '')")
+        comando = [sys.executable, "-m", "editalote", "_escolher", tipo]
     try:
-        saida = subprocess.run([sys.executable, "-c", codigo], capture_output=True,
-                               text=True, timeout=600)
-        return jsonify({"caminho": os.path.normpath(saida.stdout.strip()) if saida.stdout.strip() else ""})
+        saida = subprocess.run(comando, capture_output=True, encoding="utf-8", timeout=600,
+                               env={**os.environ, "PYTHONIOENCODING": "utf-8"}, cwd=RAIZ,
+                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        caminho = saida.stdout.strip().splitlines()[-1].strip() if saida.stdout.strip() else ""
+        return jsonify({"caminho": os.path.normpath(caminho) if caminho else ""})
     except Exception as erro:
         return jsonify({"caminho": "", "erro": f"Não consegui abrir a janela ({erro}). Digite o caminho."})
 
@@ -115,6 +115,7 @@ def previa():
 @app.get("/api/presets")
 def listar_presets():
     presets = []
+    os.makedirs(PASTA_PRESETS, exist_ok=True)
     for nome in sorted(os.listdir(PASTA_PRESETS)):
         if nome.endswith(".json"):
             with open(os.path.join(PASTA_PRESETS, nome), encoding="utf-8") as f:

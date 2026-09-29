@@ -211,7 +211,8 @@ class Trabalho:
 
         self.estado, self.mensagem = "processando", "Editando…"
         resultados: dict[int, dict] = {}
-        processos = processos or max(1, (os.cpu_count() or 2) - 1)
+        # cada processo usa ~300 MB com fotos de 24 MP; 8 é seguro num PC de 8 GB
+        processos = processos or min(8, max(1, (os.cpu_count() or 2) - 1))
         with ProcessPoolExecutor(max_workers=processos) as executor:
             # janela limitada de tarefas em voo: cancela rápido e não enche a memória
             pendentes = {}
