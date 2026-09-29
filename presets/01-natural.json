@@ -1,0 +1,16 @@
+{
+  "nome": "Natural",
+  "auto_exposicao": 0.5,
+  "auto_balanco_branco": 0.4,
+  "exposicao": 0,
+  "contraste": 8,
+  "realces": -10,
+  "sombras": 10,
+  "brancos": 0,
+  "pretos": 0,
+  "temperatura": 0,
+  "matiz": 0,
+  "saturacao": 0,
+  "vibracao": 10,
+  "nitidez": 10
+}

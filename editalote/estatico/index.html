@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EditaLote</title>
+<style>
+  :root {
+    --fundo: #141517; --painel: #1d1f22; --borda: #2c2f33; --texto: #e7e7e9;
+    --suave: #9a9ea5; --destaque: #e0a458; --ok: #6cc18a; --erro: #e06c6c;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fundo); color: var(--texto);
+         font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { padding: 12px 20px; border-bottom: 1px solid var(--borda); display: flex;
+           align-items: baseline; gap: 12px; }
+  header h1 { margin: 0; font-size: 18px; }
+  header span { color: var(--suave); }
+  main { display: grid; grid-template-columns: 380px 1fr; height: calc(100vh - 49px); }
+  aside { overflow-y: auto; border-right: 1px solid var(--borda); padding: 12px 16px 80px; }
+  section { margin-bottom: 18px; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--suave);
+       margin: 0 0 8px; }
+  label { display: block; color: var(--suave); font-size: 12px; margin: 8px 0 3px; }
+  input[type=text], input[type=number], select {
+    width: 100%; background: var(--painel); color: var(--texto); border: 1px solid var(--borda);
+    border-radius: 6px; padding: 7px 8px; font: inherit; }
+  .linha { display: flex; gap: 6px; align-items: center; }
+  .linha > input[type=text] { flex: 1; }
+  button { background: var(--painel); color: var(--texto); border: 1px solid var(--borda);
+           border-radius: 6px; padding: 7px 12px; font: inherit; cursor: pointer; white-space: nowrap; }
+  button:hover { border-color: var(--suave); }
+  button.principal { background: var(--destaque); color: #1a1206; border: 0; font-weight: 600;
+                     width: 100%; padding: 12px; font-size: 15px; }
+  button:disabled { opacity: .5; cursor: default; }
+  .slider { display: grid; grid-template-columns: 110px 1fr 44px; align-items: center; gap: 8px;
+            margin: 4px 0; }
+  .slider span { color: var(--suave); font-size: 12px; }
+  .slider output { text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; }
+  input[type=range] { width: 100%; accent-color: var(--destaque); }
+  .check { display: flex; gap: 8px; align-items: center; margin: 6px 0; color: var(--texto); font-size: 13px; }
+  .camera { background: var(--painel); border: 1px solid var(--borda); border-radius: 8px;
+            padding: 8px 10px; margin-bottom: 8px; }
+  .camera b { display: block; }
+  .camera small { color: var(--suave); }
+  .camera .grade { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-top: 6px; }
+  .camera .grade label { margin: 0; font-size: 10px; }
+  .camera .grade input { padding: 4px; font-size: 12px; }
+  .dica { color: var(--suave); font-size: 12px; margin: 4px 0; }
+  .direita { display: flex; flex-direction: column; min-width: 0; }
+  .amostras { display: flex; gap: 6px; padding: 10px; overflow-x: auto; border-bottom: 1px solid var(--borda);
+              min-height: 92px; }
+  .amostras img { height: 72px; border-radius: 4px; cursor: pointer; opacity: .6; border: 2px solid transparent; }
+  .amostras img.ativa { opacity: 1; border-color: var(--destaque); }
+  .palco { flex: 1; display: flex; align-items: center; justify-content: center; padding: 16px;
+           position: relative; min-height: 0; }
+  .comparar { position: relative; max-width: 100%; max-height: 100%; user-select: none; }
+  .comparar img { display: block; max-width: 100%; max-height: calc(100vh - 200px); }
+  .comparar .depois { position: absolute; inset: 0; overflow: hidden; }
+  .comparar .depois img { max-width: none; max-height: none; }
+  .comparar .alca { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff;
+                    cursor: ew-resize; box-shadow: 0 0 4px #000; }
+  .comparar .alca::after { content: "⟷"; position: absolute; top: 50%; left: 50%;
+                           transform: translate(-50%,-50%); background: #fff; color: #000;
+                           border-radius: 50%; width: 26px; height: 26px; display: grid;
+                           place-items: center; font-size: 14px; }
+  .rotulo { position: absolute; top: 8px; padding: 2px 8px; background: #000a; border-radius: 4px;
+            font-size: 12px; }
+  .vazio { color: var(--suave); text-align: center; max-width: 420px; }
+  .progresso { position: fixed; left: 0; right: 0; bottom: 0; background: var(--painel);
+               border-top: 1px solid var(--borda); padding: 12px 20px; display: none; }
+  .barra { height: 8px; background: var(--borda); border-radius: 4px; overflow: hidden; margin: 8px 0; }
+  .barra div { height: 100%; width: 0; background: var(--destaque); transition: width .3s; }
+  .erro { color: var(--erro); }
+  .ok { color: var(--ok); }
+  @media (max-width: 800px) {
+    main { grid-template-columns: 1fr; height: auto; }
+    aside { border-right: 0; }
+  }
+</style>
+</head>
+<body>
+<header><h1>EditaLote</h1><span>edição em lote para casamentos, aniversários e eventos</span></header>
+<main>
+  <aside>
+    <section>
+      <h2>1. Pastas</h2>
+      <label>Fotos originais (pode ter subpastas de cada fotógrafo)</label>
+      <div class="linha"><input type="text" id="entrada" placeholder="C:\Fotos\Casamento Ana e João">
+        <button onclick="escolher('entrada')">Procurar</button></div>
+      <label>Salvar as fotos editadas em</label>
+      <div class="linha"><input type="text" id="saida" placeholder="C:\Fotos\Casamento Ana e João - Editadas">
+        <button onclick="escolher('saida')">Procurar</button></div>
+      <div class="linha" style="margin-top:8px"><button onclick="escanear()">Carregar fotos</button>
+        <span id="resumo" class="dica"></span></div>
+    </section>
+
+    <section id="secCameras" style="display:none">
+      <h2>2. Câmeras encontradas</h2>
+      <p class="dica">Horário: se o relógio da câmera estava atrasado 5 minutos, coloque <b>+5:00</b>.
+        As fotos de todas as câmeras ficam na ordem certa do evento.
+        Os outros campos igualam a cor entre câmeras (ex.: Sony um pouco mais quente).</p>
+      <div id="cameras"></div>
+    </section>
+
+    <section>
+      <h2>3. Padrão de edição</h2>
+      <div class="linha"><select id="preset" onchange="usarPreset()"></select>
+        <button onclick="salvarPreset()" title="Salvar os ajustes atuais como um novo preset">Salvar</button></div>
+      <div id="sliders"></div>
+      <label>LUT criativa (.cube) — opcional</label>
+      <div class="linha"><input type="text" id="lut" placeholder="nenhuma" onchange="mudou()">
+        <button onclick="escolher('lut')">Procurar</button></div>
+    </section>
+
+    <section>
+      <h2>4. Exportação</h2>
+      <label class="check"><input type="checkbox" id="renomear" checked> Renomear em ordem de horário</label>
+      <label>Nome do evento (vira o nome dos arquivos)</label>
+      <input type="text" id="prefixo" value="Casamento" placeholder="Casamento_Ana_Joao">
+      <label>Qualidade do JPEG (95 = idêntica a olho nu; 100 = arquivo maior)</label>
+      <input type="number" id="qualidade" value="95" min="80" max="100">
+      <label class="check"><input type="checkbox" id="versao_web"> Gerar também versão leve (2048 px) para WhatsApp/Instagram</label>
+      <label class="check"><input type="checkbox" id="separar_desfocadas" checked> Separar fotos possivelmente desfocadas para revisão</label>
+    </section>
+
+    <button class="principal" id="btnProcessar" onclick="processar()">Editar todas as fotos</button>
+    <p id="msg" class="dica"></p>
+  </aside>
+
+  <div class="direita">
+    <div class="amostras" id="amostras"></div>
+    <div class="palco" id="palco">
+      <div class="vazio">Escolha a pasta com as fotos e clique em <b>Carregar fotos</b>.<br><br>
+        Clique numa miniatura para ver o <b>antes e depois</b> e ajustar o padrão.
+        Nada é alterado nos arquivos originais.</div>
+    </div>
+  </div>
+</main>
+
+<div class="progresso" id="progresso">
+  <div class="linha" style="justify-content:space-between">
+    <b id="progTexto">Processando…</b>
+    <span class="linha">
+      <button id="btnAbrir" style="display:none" onclick="abrirSaida()">Abrir pasta</button>
+      <button id="btnCancelar" onclick="cancelar()">Cancelar</button>
+      <button id="btnFechar" style="display:none" onclick="fecharProgresso()">Fechar</button>
+    </span>
+  </div>
+  <div class="barra"><div id="progBarra"></div></div>
+  <div id="progDetalhe" class="dica"></div>
+</div>
+
+<script>
+const CONTROLES = [
+  ["auto_exposicao", "Auto exposição", 0, 1, 0.05, "Iguala o brilho entre as fotos (0 = desligado)"],
+  ["auto_balanco_branco", "Auto balanço", 0, 1, 0.05, "Neutraliza dominantes de cor (0 = desligado)"],
+  ["exposicao", "Exposição", -2, 2, 0.05],
+  ["contraste", "Contraste", -100, 100, 1],
+  ["realces", "Realces", -100, 100, 1],
+  ["sombras", "Sombras", -100, 100, 1],
+  ["brancos", "Brancos", -100, 100, 1],
+  ["pretos", "Pretos", -100, 100, 1],
+  ["temperatura", "Temperatura", -100, 100, 1],
+  ["matiz", "Matiz", -100, 100, 1],
+  ["saturacao", "Saturação", -100, 100, 1],
+  ["vibracao", "Vibração", -100, 100, 1],
+  ["nitidez", "Nitidez", 0, 100, 1],
+  ["lut_intensidade", "Força da LUT", 0, 100, 1],
+];
+let ajustes = {}, presets = [], cameras = [], fotoAtual = null, timer = null, poll = null;
+const $ = id => document.getElementById(id);
+const esc = t => String(t ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+
+function montarSliders() {
+  $("sliders").innerHTML = CONTROLES.map(([k, nome, min, max, passo, dica]) => `
+    <div class="slider" title="${dica || ""}"><span>${nome}</span>
+      <input type="range" id="s_${k}" min="${min}" max="${max}" step="${passo}"
+        oninput="ajustes['${k}']=+this.value; $('o_${k}').value=this.value; mudou()"
+        ondblclick="resetar('${k}')">
+      <output id="o_${k}"></output></div>`).join("");
+}
+function mostrarAjustes() {
+  for (const [k] of CONTROLES) {
+    const v = ajustes[k] ?? 0;
+    $("s_" + k).value = v; $("o_" + k).value = v;
+  }
+  $("lut").value = ajustes.lut || "";
+}
+function resetar(k) { ajustes[k] = (k === "lut_intensidade") ? 100 : 0; mostrarAjustes(); mudou(); }
+
+async function api(url, corpo) {
+  const r = await fetch(url, corpo === undefined ? {} : {
+    method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(corpo)});
+  const dados = await r.json();
+  if (!r.ok) throw new Error(dados.erro || "Erro");
+  return dados;
+}
+
+async function carregarPresets(selecionar) {
+  presets = await api("/api/presets");
+  $("preset").innerHTML = presets.map((p, i) => `<option value="${i}">${esc(p.nome)}</option>`).join("");
+  const i = selecionar ? presets.findIndex(p => p.arquivo === selecionar) : 0;
+  $("preset").value = Math.max(0, i);
+  usarPreset();
+}
+function usarPreset() {
+  const p = presets[$("preset").value] || {};
+  const cams = ajustes.cameras || {};
+  ajustes = {lut_intensidade: 100, ...structuredClone(p), cameras: cams};
+  delete ajustes.arquivo;
+  mostrarAjustes(); mudou();
+}
+async function salvarPreset() {
+  const nome = prompt("Nome do preset:", presets[$("preset").value]?.nome || "Meu padrão");
+  if (!nome) return;
+  const r = await api("/api/presets", {...ajustes, nome});
+  await carregarPresets(r.arquivo);
+}
+
+async function escolher(campo) {
+  const r = await api("/api/escolher", {tipo: campo === "lut" ? "lut" : "pasta"});
+  if (r.erro) alert(r.erro);
+  if (!r.caminho) return;
+  $(campo).value = r.caminho;
+  if (campo === "entrada" && !$("saida").value) $("saida").value = r.caminho + " - Editadas";
+  if (campo === "entrada") escanear();
+  if (campo === "lut") { ajustes.lut = r.caminho; mudou(); }
+}
+
+async function escanear() {
+  const pasta = $("entrada").value.trim();
+  if (!pasta) return;
+  $("resumo").textContent = "Lendo…";
+  try {
+    const r = await api("/api/escanear", {pasta, saida: $("saida").value.trim()});
+    $("resumo").textContent = `${r.total} fotos`;
+    cameras = r.cameras;
+    montarCameras();
+    $("amostras").innerHTML = r.amostras.map((a, i) =>
+      `<img src="/api/miniatura?caminho=${encodeURIComponent(a.caminho)}&lado=200"
+        title="${esc(a.nome)} — ${esc(a.camera)}" data-caminho="${encodeURIComponent(a.caminho)}"
+        onclick="selecionar(this)">`).join("");
+    const primeira = $("amostras").querySelector("img");
+    if (primeira) selecionar(primeira);
+  } catch (e) { $("resumo").innerHTML = `<span class="erro">${esc(e.message)}</span>`; }
+}
+
+function montarCameras() {
+  $("secCameras").style.display = cameras.length ? "" : "none";
+  ajustes.cameras = ajustes.cameras || {};
+  $("cameras").innerHTML = cameras.map((c, i) => {
+    const a = ajustes.cameras[c.id] || {};
+    const campo = (k, rotulo) => `<div><label>${rotulo}</label><input type="number" step="${k === "exposicao" ? 0.05 : 1}"
+      value="${a[k] || 0}" onchange="ajusteCamera(${i}, '${k}', +this.value)"></div>`;
+    return `<div class="camera"><b>${esc(c.nome)}</b>
+      <small>${c.fotos} fotos${c.inicio ? ` · ${c.inicio} → ${c.fim}` : " · sem horário no EXIF"}</small>
+      <div class="grade">
+        <div><label>Horário</label><input type="text" placeholder="+0:00" id="hora_${i}"></div>
+        ${campo("exposicao", "Expos.")}${campo("temperatura", "Temp.")}${campo("matiz", "Matiz")}${campo("saturacao", "Satur.")}
+      </div></div>`;
+  }).join("");
+}
+function ajusteCamera(i, k, v) {
+  const id = cameras[i].id;
+  ajustes.cameras[id] = {...(ajustes.cameras[id] || {}), [k]: v};
+  mudou();
+}
+function lerHorario(texto) {
+  texto = (texto || "").trim();
+  if (!texto) return 0;
+  const sinal = texto.startsWith("-") ? -1 : 1;
+  const partes = texto.replace(/^[+-]/, "").split(":").map(Number);
+  if (partes.some(isNaN)) throw new Error(`Horário inválido: "${texto}". Use o formato +5:00 ou -1:02:30`);
+  let seg = 0;
+  if (partes.length === 1) seg = partes[0] * 60;       // só minutos
+  else if (partes.length === 2) seg = partes[0] * 60 + partes[1];
+  else seg = partes[0] * 3600 + partes[1] * 60 + partes[2];
+  return sinal * seg;
+}
+
+function selecionar(img) {
+  document.querySelectorAll(".amostras img").forEach(x => x.classList.remove("ativa"));
+  img.classList.add("ativa");
+  fotoAtual = decodeURIComponent(img.dataset.caminho);
+  const antes = `/api/miniatura?caminho=${img.dataset.caminho}&lado=1400`;
+  $("palco").innerHTML = `
+    <div class="comparar" id="comparar">
+      <img id="imgAntes" src="${antes}">
+      <div class="depois" id="depois"><img id="imgDepois"></div>
+      <div class="alca" id="alca"></div>
+      <span class="rotulo" style="left:8px">Antes</span>
+      <span class="rotulo" style="right:8px">Depois</span>
+    </div>`;
+  $("imgAntes").onload = () => { posicionar(0.5); };
+  ligarArraste();
+  atualizarPrevia();
+}
+function posicionar(f) {
+  const c = $("comparar"), antes = $("imgAntes");
+  if (!c || !antes) return;
+  const w = antes.clientWidth, h = antes.clientHeight;
+  const x = Math.max(0, Math.min(1, f)) * w;
+  $("depois").style.left = x + "px";
+  $("depois").style.width = (w - x) + "px";
+  const d = $("imgDepois");
+  d.style.width = w + "px"; d.style.height = h + "px"; d.style.marginLeft = -x + "px";
+  $("alca").style.left = x + "px";
+  c.dataset.f = f;
+}
+function ligarArraste() {
+  const c = $("comparar");
+  const mover = e => {
+    const r = c.getBoundingClientRect();
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+    posicionar(x / r.width);
+  };
+  let arrastando = false;
+  c.addEventListener("pointerdown", e => { arrastando = true; mover(e); });
+  window.addEventListener("pointermove", e => arrastando && mover(e));
+  window.addEventListener("pointerup", () => arrastando = false);
+  window.addEventListener("resize", () => posicionar(+c.dataset.f || 0.5));
+}
+function mudou() {
+  clearTimeout(timer);
+  timer = setTimeout(atualizarPrevia, 250);
+}
+async function atualizarPrevia() {
+  ajustes.lut = $("lut").value.trim() || null;
+  if (!fotoAtual) return;
+  const alvo = fotoAtual;
+  const r = await fetch("/api/previa", {method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({caminho: alvo, ajustes, lado: 1400})});
+  if (!r.ok) { $("msg").innerHTML = `<span class="erro">${esc((await r.json()).erro)}</span>`; return; }
+  $("msg").textContent = "";
+  const url = URL.createObjectURL(await r.blob());
+  if (alvo !== fotoAtual || !$("imgDepois")) return;
+  const d = $("imgDepois");
+  const velho = d.src;
+  d.onload = () => { if (velho) URL.revokeObjectURL(velho); posicionar(+$("comparar").dataset.f || 0.5); };
+  d.src = url;
+}
+
+async function processar() {
+  let ajusteHorario = {};
+  try {
+    cameras.forEach((c, i) => { const s = lerHorario($("hora_" + i)?.value); if (s) ajusteHorario[c.id] = s; });
+  } catch (e) { alert(e.message); return; }
+  const corpo = {
+    entrada: $("entrada").value.trim(), saida: $("saida").value.trim(),
+    ajustes: {...ajustes, lut: $("lut").value.trim() || null},
+    opcoes: {
+      renomear: $("renomear").checked, prefixo: $("prefixo").value.trim(),
+      qualidade: +$("qualidade").value, versao_web: $("versao_web").checked,
+      separar_desfocadas: $("separar_desfocadas").checked, ajuste_horario: ajusteHorario,
+    },
+  };
+  try { await api("/api/processar", corpo); }
+  catch (e) { alert(e.message); return; }
+  $("btnProcessar").disabled = true;
+  $("progresso").style.display = "block";
+  $("btnCancelar").style.display = ""; $("btnFechar").style.display = "none"; $("btnAbrir").style.display = "none";
+  poll = setInterval(acompanhar, 700);
+}
+function tempo(s) {
+  if (s == null) return "…";
+  const m = Math.floor(s / 60);
+  return m ? `${m} min ${s % 60}s` : `${s}s`;
+}
+async function acompanhar() {
+  const s = await api("/api/status");
+  const pct = s.total ? (100 * s.feitas / s.total) : 0;
+  $("progBarra").style.width = pct + "%";
+  $("progTexto").textContent = `${s.mensagem} ${s.total ? `${s.feitas} de ${s.total}` : ""}`;
+  let det = `Tempo: ${tempo(s.decorrido)}`;
+  if (s.estado === "processando") det += ` · faltam ~${tempo(s.restante)}`;
+  if (s.qtd_erros) det += ` · <span class="erro">${s.qtd_erros} com erro</span>`;
+  if (s.estado === "concluido") {
+    det += ` · <span class="ok">pronto!</span>`;
+    if (s.desfocadas) det += ` · ${s.desfocadas} separadas em "_revisar_desfocadas"`;
+    det += ` · relatório em relatorio.csv`;
+  }
+  if (s.estado === "erro") det = `<span class="erro">${esc(s.mensagem)}</span>`;
+  if (s.erros?.length) det += "<br>" + s.erros.slice(-3).map(esc).join("<br>");
+  $("progDetalhe").innerHTML = det;
+  if (["concluido", "cancelado", "erro"].includes(s.estado)) {
+    clearInterval(poll);
+    $("btnProcessar").disabled = false;
+    $("btnCancelar").style.display = "none"; $("btnFechar").style.display = "";
+    if (s.estado === "concluido") $("btnAbrir").style.display = "";
+  }
+}
+async function cancelar() { await api("/api/cancelar", {}); }
+function fecharProgresso() { $("progresso").style.display = "none"; }
+async function abrirSaida() { await api("/api/abrir-pasta", {pasta: $("saida").value.trim()}); }
+
+montarSliders();
+carregarPresets();
+</script>
+</body>
+</html>

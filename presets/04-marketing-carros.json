@@ -1,0 +1,16 @@
+{
+  "nome": "Marketing / Loja de Carros",
+  "auto_exposicao": 0.5,
+  "auto_balanco_branco": 0.6,
+  "exposicao": 0,
+  "contraste": 18,
+  "realces": -25,
+  "sombras": 15,
+  "brancos": 10,
+  "pretos": -10,
+  "temperatura": 0,
+  "matiz": 0,
+  "saturacao": 0,
+  "vibracao": 20,
+  "nitidez": 30
+}

@@ -1,0 +1,16 @@
+{
+  "nome": "Claro e Leve",
+  "auto_exposicao": 0.6,
+  "auto_balanco_branco": 0.5,
+  "exposicao": 0.3,
+  "contraste": -10,
+  "realces": -20,
+  "sombras": 25,
+  "brancos": 0,
+  "pretos": 8,
+  "temperatura": -4,
+  "matiz": 2,
+  "saturacao": -10,
+  "vibracao": 5,
+  "nitidez": 5
+}

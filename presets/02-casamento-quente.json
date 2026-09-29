@@ -1,0 +1,16 @@
+{
+  "nome": "Casamento Quente",
+  "auto_exposicao": 0.5,
+  "auto_balanco_branco": 0.3,
+  "exposicao": 0.1,
+  "contraste": 5,
+  "realces": -15,
+  "sombras": 15,
+  "brancos": 0,
+  "pretos": 10,
+  "temperatura": 12,
+  "matiz": 3,
+  "saturacao": -5,
+  "vibracao": 12,
+  "nitidez": 10
+}
