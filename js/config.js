@@ -25,7 +25,6 @@ export const RALLY = {
 };
 
 // 4) DESAFIOS — cada um pode ser marcado 1 vez por dia.
-//    Os ids e pontos também estão no firestore.rules; mude nos dois lugares.
 export const DESAFIOS = [
   { id: "meditacao-palavra", titulo: "Meditação da Palavra", pontos: 50, icone: "livro" },
   { id: "meditacao-bispo", titulo: "Meditação do Bispo", pontos: 50, icone: "play" },
@@ -34,15 +33,18 @@ export const DESAFIOS = [
   { id: "trouxe-alma", titulo: "Trouxe alma em qualquer reunião", pontos: 200, icone: "pessoas" },
   { id: "limpou-igreja", titulo: "Limpou uma parte crítica da igreja", pontos: 100, icone: "vassoura" },
   { id: "fez-em-casa", titulo: "Fez alguma coisa em casa", pontos: 80, icone: "casa" },
-  { id: "codigo-q", titulo: "Código Q", pontos: 30, icone: "radio" },
+  { id: "jejum", titulo: "Jejum", pontos: 150, icone: "prato" },
+];
+
+// Desafios que saíram da lista: registros antigos continuam valendo e aparecem com este nome.
+export const DESAFIOS_ANTIGOS = [
+  { id: "codigo-q", titulo: "Código Q", icone: "radio" },
 ];
 
 // 5) PRÊMIOS — texto livre, mude quando decidirem.
 export const PREMIOS = {
   individuais: [
-    { lugar: 1, premio: "Rodízio + Arca Center" },
-    { lugar: 2, premio: "Arca Center" },
-    { lugar: 3, premio: "Livro da Fé" },
+    { lugar: 1, premio: "Rodízio" },
   ],
-  projeto: "Necessidade do projeto ou os integrantes saírem para algum lugar.",
+  projeto: "", // deixe vazio para não mostrar
 };

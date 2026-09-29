@@ -10,6 +10,7 @@ export const ICONES = {
   vassoura: svg('<path d="M20 3 11.5 11.5"/><path d="M9 11c-3 0-5 2-6 6l-1 4 4-1c4-1 6-3 6-6z"/><path d="m6.5 16.5 2-2"/>'),
   casa: svg('<path d="M3 11 12 3l9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>'),
   radio: svg('<rect x="6" y="8" width="12" height="14" rx="2"/><path d="M9 8V2M9 12h6M9 15h6M9 18h2"/>'),
+  prato: svg('<circle cx="12" cy="13" r="6"/><path d="M3 3v6a2 2 0 0 0 2 2M5 3v18M20 3c-1.5 1-2 3-2 5s1 3 2 3v10"/>'),
   check: svg('<path d="m5 12 5 5L20 7"/>', 'stroke-width="3"'),
   alvo: svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>'),
   trofeu: svg('<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>'),

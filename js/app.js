@@ -1,8 +1,8 @@
-import { DESAFIOS, PREMIOS, RALLY } from "./config.js";
+import { DESAFIOS, DESAFIOS_ANTIGOS, PREMIOS, RALLY } from "./config.js";
 import { store, hoje, normalizarUsuario } from "./store.js";
 import { ICONES } from "./icons.js";
 
-const VERSAO_APP = "versão 4";
+const VERSAO_APP = "versão 5";
 const $app = document.getElementById("app");
 const $toast = document.getElementById("toast");
 
@@ -24,7 +24,8 @@ const estado = {
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const fmt = (n) => n.toLocaleString("pt-BR");
-const desafio = (id) => DESAFIOS.find((d) => d.id === id) || { titulo: id, icone: "alvo", pontos: 0 };
+const desafio = (id) =>
+  DESAFIOS.find((d) => d.id === id) || DESAFIOS_ANTIGOS.find((d) => d.id === id) || { titulo: id, icone: "alvo", pontos: 0 };
 const iniciais = (nome) => nome.trim().split(/\s+/).slice(0, 2).map((p) => p[0]).join("").toUpperCase();
 const primeiroNome = (nome) => nome.trim().split(/\s+/)[0];
 
@@ -304,7 +305,7 @@ function telaHistorico() {
 
 function telaPremios() {
   return `
-    <div class="titulo-secao"><h2>Premiações <em>individuais</em></h2></div>
+    <div class="titulo-secao"><h2>Premiação <em>do Rally</em></h2></div>
     <section class="lista">
       ${PREMIOS.individuais.map((p) => `
         <div class="premio l${p.lugar}">
@@ -312,8 +313,9 @@ function telaPremios() {
           <span><small>${p.lugar}º lugar</small><strong>${esc(p.premio)}</strong></span>
         </div>`).join("")}
     </section>
+    ${PREMIOS.projeto ? `
     <div class="titulo-secao"><h2>Premiação <em>do projeto</em></h2></div>
-    <div class="premio-projeto"><h3>1º lugar</h3>${esc(PREMIOS.projeto)}</div>
+    <div class="premio-projeto"><h3>1º lugar</h3>${esc(PREMIOS.projeto)}</div>` : ""}
     <div class="frase-final"><span class="pincel">Mais pontos, mais propósito!</span></div>`;
 }
 

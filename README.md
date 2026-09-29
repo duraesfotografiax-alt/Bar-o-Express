@@ -17,7 +17,7 @@ Cada desafio pode ser marcado **uma vez por dia**. O integrante pode desfazer um
 | 5 | Trouxe alma em qualquer reunião | 200 |
 | 6 | Limpou uma parte crítica da igreja | 100 |
 | 7 | Fez alguma coisa em casa | 80 |
-| 8 | Código Q | 30 |
+| 8 | Jejum | 150 |
 
 ## Como o celular usa o app
 
@@ -65,10 +65,10 @@ Tudo fica em [`js/config.js`](js/config.js):
 
 - `ADMINS`: quem é administrador. **Se mudar, mude também em `firestore.rules`** (`'lucas@uniforca.app'`).
 - `RALLY`: data de início e de fim. Só contam os pontos feitos dentro desse período.
-- `DESAFIOS`: nomes e pontos. **Se mudar ids ou pontos, mude também em `firestore.rules`.**
-- `PREMIOS`: textos dos prêmios. Troque quando decidirem.
+- `DESAFIOS`: nomes e pontos (até 300 por desafio). Não precisa mexer no `firestore.rules`.
+- `PREMIOS`: textos dos prêmios.
 
-Depois de mudar arquivos, aumente a versão em `sw.js` (`uniforca-v1` → `uniforca-v2`) para os celulares baixarem a versão nova.
+Depois de mudar arquivos, aumente a versão em `sw.js` (`uniforca-vN`) e `VERSAO_APP` em `js/app.js`.
 
 ## Testar no computador
 
