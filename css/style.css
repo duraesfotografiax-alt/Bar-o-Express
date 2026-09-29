@@ -1,5 +1,6 @@
 /* Projeto Uniforça — paleta do Rally: laranja, preto e branco */
 :root {
+  color-scheme: dark;
   --laranja: #ffa200;
   --laranja-2: #f08c00;
   --laranja-3: #ffc24d;
