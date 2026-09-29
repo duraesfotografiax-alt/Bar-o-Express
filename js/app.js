@@ -2,6 +2,7 @@ import { DESAFIOS, PREMIOS, RALLY } from "./config.js";
 import { store, hoje, normalizarUsuario } from "./store.js";
 import { ICONES } from "./icons.js";
 
+const VERSAO_APP = "versão 4";
 const $app = document.getElementById("app");
 const $toast = document.getElementById("toast");
 
@@ -189,6 +190,7 @@ function moldura(conteudo) {
       </header>
       ${store.modo === "demo" ? `<div class="faixa-demo">Modo demonstração — dados salvos só neste aparelho.</div>` : ""}
       <main class="anima">${conteudo}</main>
+      <p class="versao">${VERSAO_APP}</p>
     </div>
     <nav class="nav">
       ${abas.map((a) => `<button data-aba="${a.id}" class="${estado.aba === a.id ? "ativo" : ""}">${ICONES[a.icone]}<span>${a.rotulo}</span></button>`).join("")}
@@ -553,6 +555,16 @@ $app.addEventListener("input", (e) => {
   });
 })();
 
-if ("serviceWorker" in navigator && location.protocol === "https:") {
-  navigator.serviceWorker.register("sw.js").catch(() => {});
+if ("serviceWorker" in navigator && window.isSecureContext) {
+  // Quando uma versão nova do app assume, recarrega uma vez para já usá-la.
+  const tinhaVersao = !!navigator.serviceWorker.controller;
+  let recarregou = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!tinhaVersao || recarregou) return;
+    recarregou = true;
+    location.reload();
+  });
+  navigator.serviceWorker.register("sw.js", { updateViaCache: "none" })
+    .then((reg) => reg.update())
+    .catch(() => {});
 }

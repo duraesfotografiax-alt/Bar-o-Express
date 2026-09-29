@@ -1,6 +1,6 @@
 // Guarda os arquivos do app no aparelho para abrir rápido.
 // Ao mudar qualquer arquivo, aumente a versão abaixo.
-const VERSAO = "uniforca-v3";
+const VERSAO = "uniforca-v4";
 const ARQUIVOS = [
   "./", "index.html", "css/style.css", "js/app.js", "js/store.js", "js/config.js", "js/icons.js",
   "manifest.webmanifest", "assets/logo.png", "assets/icon-192.png", "assets/icon-512.png",
@@ -19,11 +19,13 @@ self.addEventListener("activate", (e) => {
 });
 
 // Rede primeiro (para sempre pegar a versão nova); cache se estiver sem internet.
+// "no-cache" faz o navegador conferir com o servidor em vez de usar a cópia
+// guardada (o GitHub Pages manda guardar por 10 minutos).
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== location.origin) return;
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request.url, { cache: "no-cache" })
       .then((resp) => {
         const copia = resp.clone();
         caches.open(VERSAO).then((c) => c.put(e.request, copia));
