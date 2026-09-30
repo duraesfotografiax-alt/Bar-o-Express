@@ -61,18 +61,18 @@ jobs:
         run: |
           # metade com a edição dentro do JPEG, metade com .xmp ao lado (como o Lightroom exporta)
           python -c "import sys, pathlib; sys.path.insert(0, 'tests'); from test_estilo_ia import evento; p = pathlib.Path('exportado'); p.mkdir(); evento(p, 30, semente=1); q = p / 'sidecar'; q.mkdir(); evento(q, 30, semente=2, sidecar=True)"
-          $p = Start-Process ./dist/DuraesApp/DuraesApp.exe -ArgumentList @("aprender", "exportado", "--nome", "Estilo Teste") -Wait -PassThru
+          $p = Start-Process ./dist/DuraesApp/DuraesApp.exe -ArgumentList @("aprender", "exportado", "--nome", "EstiloTeste") -Wait -PassThru
           Get-Content dist/DuraesApp/duraesapp.log -ErrorAction SilentlyContinue
           if ($p.ExitCode -ne 0) { Write-Host "Código de saída: $($p.ExitCode)"; exit 1 }
-          if (-not (Test-Path dist/DuraesApp/presets/estilos/estilo-teste.json)) { Write-Host "Modelo não foi salvo"; exit 1 }
-          $preset = Get-Content dist/DuraesApp/presets/estilo-teste.json -Raw | ConvertFrom-Json
-          if ($preset.estilo_ia -ne "estilos/estilo-teste.json") { exit 1 }
+          if (-not (Test-Path dist/DuraesApp/presets/estilos/estiloteste.json)) { Write-Host "Modelo não foi salvo"; exit 1 }
+          $preset = Get-Content dist/DuraesApp/presets/estiloteste.json -Raw | ConvertFrom-Json
+          if ($preset.estilo_ia -ne "estilos/estiloteste.json") { exit 1 }
           # usa o estilo aprendido para editar as fotos
-          $p = Start-Process ./dist/DuraesApp/DuraesApp.exe -ArgumentList @("processar", "amostra", "saida-ia", "--preset", "dist/DuraesApp/presets/estilo-teste.json") -Wait -PassThru
+          $p = Start-Process ./dist/DuraesApp/DuraesApp.exe -ArgumentList @("processar", "amostra", "saida-ia", "--preset", "dist/DuraesApp/presets/estiloteste.json") -Wait -PassThru
           if ($p.ExitCode -ne 0) { exit 1 }
           if ((Get-ChildItem saida-ia -Filter *.jpg).Count -ne 12) { exit 1 }
           Get-Content saida-ia/relatorio.csv -TotalCount 4
-          Remove-Item -Recurse dist/DuraesApp/presets/estilos, dist/DuraesApp/presets/estilo-teste.json, dist/DuraesApp/duraesapp.log
+          Remove-Item -Recurse dist/DuraesApp/presets/estilos, dist/DuraesApp/presets/estiloteste.json, dist/DuraesApp/duraesapp.log
 
       - name: Testar a janela do programa e a ligação com a tela
         shell: pwsh

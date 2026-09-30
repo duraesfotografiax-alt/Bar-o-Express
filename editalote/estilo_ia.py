@@ -101,12 +101,15 @@ class Diagnostico:
 
     def __init__(self):
         self.jpegs = self.xmps = self.com_edicao = self.ja_editadas = self.sem_edicao = 0
+        self.ilegiveis = 0
 
     def texto(self) -> str:
         partes = [f"{self.jpegs} fotos JPEG", f"{self.xmps} arquivos .xmp",
                   f"{self.com_edicao} com edição do Lightroom"]
         if self.ja_editadas:
             partes.append(f"{self.ja_editadas} já exportadas com a edição aplicada (não servem)")
+        if self.ilegiveis:
+            partes.append(f"{self.ilegiveis} que não consegui abrir")
         return "Encontrei " + ", ".join(partes) + "."
 
 
@@ -145,6 +148,7 @@ def _caracteristicas_seguro(caminho: str):
     try:
         return caracteristicas_arquivo(caminho)
     except Exception:  # foto corrompida: fica de fora do treino
+        logging.getLogger("editalote.ia").exception("não consegui ler %s", caminho)
         return None
 
 
@@ -187,6 +191,8 @@ def treinar(pasta: str, nome: str = "Meu estilo", limite: int = 2500,
             if carac is not None:
                 amostras.append((carac, ajustes))
                 ignorados.update(ign)
+            else:
+                diag.ilegiveis += 1
             if progresso:
                 progresso(n, len(pares))
     if len(amostras) < 10:
