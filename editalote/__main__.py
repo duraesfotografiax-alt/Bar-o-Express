@@ -54,6 +54,8 @@ def main(argv=None):
     aprender = sub.add_parser("aprender", help="treina a IA de estilo com uma pasta do Lightroom")
     aprender.add_argument("pasta", help="pasta exportada: Original + configurações")
     aprender.add_argument("--nome", default="Estilo Durães")
+    aprender.add_argument("--modo", choices=["referencia", "lightroom"], default="referencia",
+                          help="referencia = fotos finais entregues; lightroom = originais + configurações")
     proc = sub.add_parser("processar", help="processa uma pasta direto pelo terminal")
     proc.add_argument("entrada")
     proc.add_argument("saida")
@@ -78,7 +80,8 @@ def main(argv=None):
 
         configurar_log(RAIZ)
         try:
-            r = treinar_e_salvar(args.pasta, args.nome, PASTA_PRESETS, _nome_arquivo(args.nome, "estilo"))
+            r = treinar_e_salvar(args.pasta, args.nome, PASTA_PRESETS, _nome_arquivo(args.nome, "estilo"),
+                                 modo=args.modo)
         except ValueError as erro:
             print(erro)
             return 2

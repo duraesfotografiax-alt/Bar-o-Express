@@ -49,6 +49,8 @@ AJUSTES_PADRAO: dict = {
     "curva_r": None,
     "curva_g": None,
     "curva_b": None,
+    # Curva calculada pela IA de referência para cada foto (não aparece na tela)
+    "curva_ref": None,
     "lut": None,                 # caminho de arquivo .cube
     "lut_intensidade": 100,      # 0..100
     "estilo_ia": None,           # modelo da IA de estilo (presets/estilos/*.json)
@@ -67,7 +69,7 @@ for _cor, _ in CORES_HSL:
 CAMPOS_POR_CAMERA = ("exposicao", "temperatura", "matiz", "saturacao")
 
 
-CAMPOS_ANULAVEIS = ("lut", "curva", "curva_r", "curva_g", "curva_b", "estilo_ia")
+CAMPOS_ANULAVEIS = ("lut", "curva", "curva_r", "curva_g", "curva_b", "curva_ref", "estilo_ia")
 
 
 def completar_ajustes(ajustes: dict | None) -> dict:
@@ -349,7 +351,9 @@ def transformar(rgb: np.ndarray, ajustes: dict, analise: Analise | None,
         v = np.clip(v / (1 - 0.06 * brancos), 0.0, 1.0)
     v = np.clip(v, 0.0, 1.0)
 
-    # 3b) curvas: primeiro por regiões, depois a de pontos (mesma ordem do Lightroom)
+    # 3b) curvas: a da IA de referência, depois por regiões e a de pontos (ordem do Lightroom)
+    if a.get("curva_ref"):
+        v = avaliar_curva(a["curva_ref"], v)
     regioes = _curva_regioes(a)
     if regioes:
         v = avaliar_curva(regioes, v)

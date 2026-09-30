@@ -30,19 +30,41 @@ editam cada tipo de foto no Lightroom e repete isso foto a foto.
 ## IA de estilo (foto a foto)
 
 Um preset aplica o **mesmo** ajuste em todas as fotos. Por isso, depois de aplicar, uma foto fica
-clara e outra escura. A IA de estilo resolve isso: ela aprende **o que vocês fazem em cada tipo
-de foto** e repete.
+clara e outra escura. A IA de estilo resolve isso: ela ajusta **cada foto** até o jeito da Durães.
+Ela aprende de dois modos (campo **Aprender com** no cartão da IA):
 
-1. No Lightroom, selecione as fotos de um casamento que vocês **já editaram** > **Exportar** >
-   tipo **Original + configurações** > exporte para uma pasta.
-   (No Lightroom Classic: selecione as fotos e use **Metadados > Salvar metadados no arquivo**.)
-2. No Durães APP, no cartão **IA · Estilo Durães**, dê um nome e clique em **Aprender meu estilo**.
-   Escolha a pasta exportada. Com 1.500 fotos leva poucos minutos.
-3. Pronto: aparece o preset **✦ Estilo Durães**. Em cada foto, a tela mostra o que a IA fez
-   (ex.: "IA nesta foto: Exposição +0,35 · Temperatura −8").
-   - **Ajuste por foto** (0–100) controla o quanto a IA varia de uma foto para outra.
-   - Os controles do painel continuam valendo como o padrão do estilo. Mexer neles muda todas as fotos.
-   - O `relatorio.csv` lista o ajuste da IA em cada foto.
+### 1. Fotos finais já entregues (mais fácil, recomendado)
+
+Escolha uma pasta com **30 a 100 fotos que vocês já entregaram**, de momentos diferentes (making
+of, cerimônia, externa, festa). Pode ser a pasta de entrega de um casamento. Não precisa do
+Lightroom nem das fotos originais.
+
+A IA mede o jeito dessas fotos: onde ficam os brancos (vestido, terno, parede), o preto "lavado",
+a cor do branco (a luz) e a saturação. Em cada foto nova ela calcula o ajuste que leva aquela foto
+até esse jeito. Para respeitar a cena, ela compara com as fotos de referência mais parecidas: a
+festa à noite é comparada com fotos de festa, não com a externa ao meio-dia.
+
+- A cor da luz é medida só no que devia ser branco ou cinza, para a IA não confundir um vestido
+  laranja ou uma parede de pedra com luz laranja.
+- A cor e a saturação são corrigidas com moderação, porque cor errada estraga mais a foto. O brilho
+  e o contraste têm força total.
+- Quanto mais fotos e mais variadas, melhor ela acerta. Com poucas fotos, a cor pode sair diferente.
+
+### 2. Originais + configurações do Lightroom
+
+No Lightroom, selecione as fotos de um casamento que vocês **já editaram** > **Exportar** > tipo
+**Original + configurações** > exporte para uma pasta. (No Lightroom Classic: selecione as fotos e
+use **Metadados > Salvar metadados no arquivo**.) A IA aprende os valores dos controles que vocês
+usaram em cada tipo de foto e repete.
+
+### Depois de treinar
+
+Aparece o preset **✦ <nome do estilo>**. Em cada foto a tela mostra o que a IA fez (ex.: "IA nesta
+foto: Exposição +0,35 · Temperatura −8").
+
+- **Ajuste por foto** (0–100) controla a força da IA.
+- Os controles do painel continuam valendo por cima: mexer neles muda todas as fotos.
+- O `relatorio.csv` lista o ajuste da IA em cada foto.
 
 Se aparecer uma mensagem de erro no cartão da IA, ela diz o que foi encontrado na pasta:
 
@@ -53,7 +75,8 @@ Se aparecer uma mensagem de erro no cartão da IA, ela diz o que foi encontrado 
   das **originais** com a edição separada, para comparar o antes com o que vocês fizeram.
 - Se a janela de escolher pasta não abrir, digite ou cole o caminho no campo **Pasta exportada do
   Lightroom**.
-- Pelo terminal também dá: `DuraesApp.exe aprender "C:\Fotos\Exportado" --nome "Estilo Durães"`.
+- Pelo terminal também dá: `DuraesApp.exe aprender "C:\Fotos\Entregues" --nome "Estilo Durães"`
+  (acrescente `--modo lightroom` para aprender das originais + configurações).
 
 Como funciona: para cada foto nova, a IA mede brilho, contraste, cor e ISO, procura as fotos do
 treino mais parecidas (os "vizinhos") e combina o que vocês fizeram nelas. Ao terminar o treino, ela
@@ -172,7 +195,8 @@ Estrutura:
 | `editalote/lightroom.py` | importa presets `.xmp` e edições salvas nas fotos |
 | `editalote/nuvem.py` | acha as pastas do OneDrive/Google Drive/Dropbox para a entrega |
 | `editalote/lote.py` | ordem por horário, renomeação, processamento paralelo, desfocadas, relatório |
-| `editalote/estilo_ia.py` | IA de estilo: treino e ajuste foto a foto (vizinhos mais próximos) |
+| `editalote/estilo_ia.py` | IA de estilo pelas configurações do Lightroom (vizinhos mais próximos) |
+| `editalote/estilo_referencia.py` | IA de estilo pelas fotos finais entregues (brancos, pretos, cor da luz) |
 | `editalote/janela.py` | janela própria do programa (pywebview / WebView2) |
 | `editalote/servidor.py` | servidor local (só `127.0.0.1`) usado pela janela |
 | `editalote/estatico/` | tela (`index.html`, `estilo.css`, `app.js`), logo e fontes (Cinzel e Montserrat, licença OFL) |

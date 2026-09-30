@@ -94,17 +94,21 @@
   <aside class="lateral dir">
     <section class="ia" id="cardIA">
       <h3><span class="selo">IA</span> Estilo Durães</h3>
-      <p id="iaInfo">Ensine a IA com um casamento que vocês já editaram no Lightroom. Ela aprende
-        como vocês ajustam cada tipo de foto (igreja escura, festa, externa) e repete foto a foto.</p>
+      <p id="iaInfo">Ensine a IA com fotos que vocês já editaram. Ela aprende o jeito da Durães e
+        ajusta cada foto nova até ele: foto escura sobe, foto clara desce, foto fria esquenta.</p>
       <div id="iaTreino">
         <label>Nome do estilo</label>
         <input type="text" id="iaNome" value="Estilo Durães">
-        <label>Pasta exportada do Lightroom (Original + configurações)</label>
+        <label>Aprender com</label>
+        <select id="iaModo" onchange="mostrarModoIA()">
+          <option value="referencia">Fotos finais já entregues (mais fácil)</option>
+          <option value="lightroom">Originais + configurações do Lightroom</option>
+        </select>
+        <label id="iaPastaRotulo">Pasta com as fotos finais</label>
         <div class="linha"><input type="text" id="iaPasta" placeholder="C:\Fotos\Casamento exportado">
           <button onclick="escolherPastaIA()">Procurar</button></div>
         <button class="destaque" id="btnTreinar" style="width:100%; margin-top:8px" onclick="treinarIA()">Aprender meu estilo</button>
-        <p class="dica" id="iaComo">No Lightroom: selecione as fotos editadas &gt; Exportar &gt; tipo
-          <b>Original + configurações</b>. Depois escolha essa pasta aqui.</p>
+        <p class="dica" id="iaComo"></p>
       </div>
       <div id="iaProgresso" style="display:none"><div class="barra"><div id="iaBarra"></div></div></div>
       <p class="dica" id="iaStatus"></p>

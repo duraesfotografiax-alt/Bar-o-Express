@@ -61,7 +61,7 @@ jobs:
         run: |
           # metade com a edição dentro do JPEG, metade com .xmp ao lado (como o Lightroom exporta)
           python -c "import sys, pathlib; sys.path.insert(0, 'tests'); from test_estilo_ia import evento; p = pathlib.Path('exportado'); p.mkdir(); evento(p, 30, semente=1); q = p / 'sidecar'; q.mkdir(); evento(q, 30, semente=2, sidecar=True)"
-          $p = Start-Process ./dist/DuraesApp/DuraesApp.exe -ArgumentList @("aprender", "exportado", "--nome", "EstiloTeste") -Wait -PassThru
+          $p = Start-Process ./dist/DuraesApp/DuraesApp.exe -ArgumentList @("aprender", "exportado", "--nome", "EstiloTeste", "--modo", "lightroom") -Wait -PassThru
           Get-Content dist/DuraesApp/duraesapp.log -ErrorAction SilentlyContinue
           if ($p.ExitCode -ne 0) { Write-Host "Código de saída: $($p.ExitCode)"; exit 1 }
           if (-not (Test-Path dist/DuraesApp/presets/estilos/estiloteste.json)) { Write-Host "Modelo não foi salvo"; exit 1 }
@@ -73,6 +73,19 @@ jobs:
           if ((Get-ChildItem saida-ia -Filter *.jpg).Count -ne 12) { exit 1 }
           Get-Content saida-ia/relatorio.csv -TotalCount 4
           Remove-Item -Recurse dist/DuraesApp/presets/estilos, dist/DuraesApp/presets/estiloteste.json, dist/DuraesApp/duraesapp.log
+
+      - name: Testar a IA por referência dentro do .exe (fotos finais)
+        shell: pwsh
+        run: |
+          # as fotos editadas no passo anterior servem de "fotos finais entregues"
+          $p = Start-Process ./dist/DuraesApp/DuraesApp.exe -ArgumentList @("aprender", "saida", "--nome", "Referencia", "--modo", "referencia") -Wait -PassThru
+          Get-Content dist/DuraesApp/duraesapp.log -ErrorAction SilentlyContinue
+          if ($p.ExitCode -ne 0) { exit 1 }
+          $p = Start-Process ./dist/DuraesApp/DuraesApp.exe -ArgumentList @("processar", "amostra", "saida-ref", "--preset", "dist/DuraesApp/presets/referencia.json") -Wait -PassThru
+          if ($p.ExitCode -ne 0) { exit 1 }
+          if ((Get-ChildItem saida-ref -Filter *.jpg).Count -ne 12) { exit 1 }
+          Get-Content saida-ref/relatorio.csv -TotalCount 3
+          Remove-Item -Recurse dist/DuraesApp/presets/estilos, dist/DuraesApp/presets/referencia.json, dist/DuraesApp/duraesapp.log
 
       - name: Testar a janela do programa e a ligação com a tela
         shell: pwsh

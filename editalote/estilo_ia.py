@@ -245,8 +245,24 @@ def treinar(pasta: str, nome: str = "Meu estilo", limite: int = 2500,
 
 
 def treinar_e_salvar(pasta: str, nome: str, pasta_presets: str, arquivo: str,
-                     progresso=None) -> dict:
-    """Treina e grava o modelo (presets/estilos/<arquivo>.json) e o preset que o usa."""
+                     progresso=None, modo: str = "referencia") -> dict:
+    """Treina e grava o modelo (presets/estilos/<arquivo>.json) e o preset que o usa.
+
+    modo "referencia": aprende das fotos finais entregues (não precisa do Lightroom).
+    modo "lightroom": aprende das originais + configurações do Lightroom.
+    """
+    if modo == "referencia":
+        from . import estilo_referencia
+
+        modelo = estilo_referencia.treinar(pasta, nome, progresso=progresso)
+        estilo_referencia.salvar(modelo, os.path.join(pasta_presets, "estilos", f"{arquivo}.json"))
+        preset = {"nome": nome, "estilo_ia": f"estilos/{arquivo}.json", "ia_forca": 100,
+                  "auto_exposicao": 0, "auto_balanco_branco": 0}
+        with open(os.path.join(pasta_presets, f"{arquivo}.json"), "w", encoding="utf-8") as f:
+            json.dump(preset, f, ensure_ascii=False, indent=2)
+        log.info("estilo %r aprendido de %d fotos finais", nome, modelo["fotos"])
+        return {"arquivo": f"{arquivo}.json", "fotos": modelo["fotos"], "modo": modo,
+                "diagnostico": modelo["diagnostico"], "precisao": {}, "ignorados": []}
     modelo = treinar(pasta, nome, progresso=progresso)
     salvar(modelo, os.path.join(pasta_presets, "estilos", f"{arquivo}.json"))
     preset = {**modelo["base"], "nome": nome, "estilo_ia": f"estilos/{arquivo}.json",
@@ -255,7 +271,7 @@ def treinar_e_salvar(pasta: str, nome: str, pasta_presets: str, arquivo: str,
     with open(os.path.join(pasta_presets, f"{arquivo}.json"), "w", encoding="utf-8") as f:
         json.dump(preset, f, ensure_ascii=False, indent=2)
     log.info("estilo %r treinado com %d fotos", nome, modelo["fotos"])
-    return {"arquivo": f"{arquivo}.json", "fotos": modelo["fotos"],
+    return {"arquivo": f"{arquivo}.json", "fotos": modelo["fotos"], "modo": modo,
             "diagnostico": modelo.get("diagnostico", ""),
             "precisao": modelo["precisao"], "ignorados": modelo["ignorados"]}
 
@@ -284,12 +300,15 @@ class Modelo:
 
 
 @lru_cache(maxsize=4)
-def _carregar(caminho: str, _mtime: float) -> Modelo:
+def _carregar(caminho: str, _mtime: float):
+    from .estilo_referencia import TIPO, ModeloReferencia
+
     with open(caminho, encoding="utf-8") as f:
-        return Modelo(json.load(f))
+        dados = json.load(f)
+    return ModeloReferencia(dados) if dados.get("tipo") == TIPO else Modelo(dados)
 
 
-def carregar(caminho: str) -> Modelo:
+def carregar(caminho: str):
     return _carregar(caminho, os.path.getmtime(caminho))
 
 
@@ -305,6 +324,10 @@ def ajustes_da_foto(ajustes: dict, caminho_foto: str, reduzida: Image.Image | No
     if not caminho_modelo or forca <= 0 or not os.path.isfile(caminho_modelo):
         return ajustes, {}
     modelo = carregar(caminho_modelo)
+    if not isinstance(modelo, Modelo):  # IA por referência (aprendeu das fotos finais)
+        from .estilo_referencia import rgb_da_foto
+
+        return modelo.ajustar(ajustes, rgb_da_foto(caminho_foto), forca)
     img = reduzida if reduzida is not None else carregar_reduzida(caminho_foto, 500)
     previsto = modelo.prever(caracteristicas(img, ler_iso(caminho_foto)))
     final = dict(ajustes)

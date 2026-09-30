@@ -143,6 +143,19 @@ async function salvarPreset() {
 }
 
 // ------------------------------------------------------------------ IA de estilo
+const COMO_IA = {
+  referencia: "Escolha uma pasta com 30 a 100 fotos que vocês já entregaram, de momentos diferentes " +
+    "(making of, cerimônia, externa, festa). Pode ser a pasta de entrega de um casamento. " +
+    "Não precisa do Lightroom nem das fotos originais.",
+  lightroom: "No Lightroom: selecione as fotos editadas > Exportar > tipo Original + configurações. " +
+    "Depois escolha essa pasta aqui.",
+};
+function mostrarModoIA() {
+  const modo = $("iaModo").value;
+  $("iaComo").textContent = COMO_IA[modo];
+  $("iaPastaRotulo").textContent = modo === "referencia" ? "Pasta com as fotos finais"
+    : "Pasta exportada do Lightroom (Original + configurações)";
+}
 function mostrarIA() {
   const ativo = !!ajustes.estilo_ia;
   $("iaForca").style.display = ativo ? "" : "none";
@@ -165,7 +178,8 @@ async function treinarIA() {
   let pasta = $("iaPasta").value.trim();
   if (!pasta) pasta = await escolherPastaIA();
   if (!pasta) { statusIA("Escolha a pasta exportada do Lightroom (Original + configurações).", true); return; }
-  try { await api("/api/estilo/treinar", {pasta, nome: $("iaNome").value.trim() || "Estilo Durães"}); }
+  try { await api("/api/estilo/treinar", {pasta, nome: $("iaNome").value.trim() || "Estilo Durães",
+                                          modo: $("iaModo").value}); }
   catch (e) { statusIA(e.message, true); return; }
   $("iaTreino").style.display = "none"; $("iaProgresso").style.display = "";
   $("iaBarra").style.width = "0";
@@ -185,6 +199,8 @@ async function treinarIA() {
       await carregarPresets(s.resultado.arquivo);
       const p = s.resultado.precisao.exposicao;
       let txt = `Aprendido de ${s.resultado.fotos} fotos.`;
+      if (s.resultado.modo === "referencia" && s.resultado.fotos < 20)
+        txt += " Para a IA acertar mais a cor e o brilho, use de 30 a 100 fotos de momentos diferentes do evento.";
       if (p) txt += ` Exposição: a IA erra em média ${num(p.erro_ia)} stop; com um ajuste fixo seriam ${num(p.erro_sem_ia)}.`;
       if (s.resultado.ignorados.length) txt += ` Não aprendido: ${s.resultado.ignorados.join(", ")}.`;
       $("iaPrecisao").textContent = txt;
@@ -558,6 +574,7 @@ async function saidaNaNuvem() {
 
 // ------------------------------------------------------------------- início
 montarSliders();
+mostrarModoIA();
 ligarCurva();
 carregarNuvem();
 carregarPresetsLR();
