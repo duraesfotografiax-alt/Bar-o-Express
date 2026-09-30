@@ -81,7 +81,12 @@ class DriveFalso:
         if metodo == "GET":
             return 200, {}, json.dumps({"id": fid, "trashed": self.arquivos[fid]["trashed"]}).encode()
         if metodo == "PATCH":
-            self.arquivos[fid].update(json.loads(corpo))
+            mudanca = json.loads(corpo)
+            # como o Google: essa opção não existe para pastas
+            if "copyRequiresWriterPermission" in mudanca and self.arquivos[fid].get("mimeType") == drive_mod.PASTA_MIME:
+                return 400, {}, json.dumps({"error": {"code": 400, "message": "Bad Request",
+                                                      "errors": [{"reason": "badRequest"}]}}).encode()
+            self.arquivos[fid].update(mudanca)
             return 200, {}, json.dumps({"id": fid}).encode()
         return 400, {}, b"{}"
 
@@ -135,7 +140,7 @@ def test_projeto_completo(ambiente):
 
     pj.alterar_download(projeto["id"], True)
     assert not any(a["copyRequiresWriterPermission"] for a in falso.fotos_em(pasta))
-    assert falso.arquivos[pasta]["copyRequiresWriterPermission"] is False
+    assert "copyRequiresWriterPermission" not in falso.arquivos[pasta]   # nunca na pasta
     assert pj.obter(projeto["id"])["permitir_download"] is True
 
 

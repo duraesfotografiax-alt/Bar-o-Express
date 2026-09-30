@@ -147,7 +147,14 @@ class Drive:
         cab = {"Content-Type": "application/json; charset=UTF-8"} if dados else {}
         status, _, resposta = self._chamar(metodo, url, cab, dados)
         if status not in (200, 204):
-            raise ErroDrive(f"Google Drive respondeu {status}: {resposta[:300].decode('utf-8', 'ignore')}")
+            texto = resposta[:500].decode("utf-8", "ignore")
+            log.error("Drive %s %s -> %s: %s", metodo, url.split("?")[0], status, texto)
+            try:
+                motivo = json.loads(texto)["error"]["message"]
+            except (ValueError, KeyError, TypeError):
+                motivo = texto[:200]
+            raise ErroDrive(f"O Google Drive recusou a operação ({status}: {motivo}). "
+                            "Detalhes em duraesapp.log.")
         return json.loads(resposta) if resposta else {}
 
     # -- conta

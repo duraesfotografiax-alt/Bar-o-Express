@@ -160,8 +160,8 @@ class Projetos:
     def alterar_download(self, pid: str, permitir: bool) -> dict:
         projeto = self._atualizar(pid, permitir_download=bool(permitir))
         if projeto.get("drive_pasta"):
+            # a opção vale para cada FOTO; o Google recusa (erro 400) essa opção em pastas
             drive = self.drive()
-            drive.permitir_download(projeto["drive_pasta"], permitir)
             itens = drive.listar(projeto["drive_pasta"])
             with ThreadPoolExecutor(max_workers=4) as ex:
                 list(ex.map(lambda item: drive.permitir_download(item["id"], permitir), itens))
@@ -239,7 +239,6 @@ class Envio:
         if not projeto.get("drive_pasta") or not drive.existe(projeto["drive_pasta"]):
             self.mensagem = "Criando a pasta do cliente no Drive…"
             pasta = drive.criar_pasta(projeto["nome"], pj._pasta_raiz(drive))
-            drive.permitir_download(pasta, projeto["permitir_download"])
             link = drive.compartilhar_com_link(pasta)
             projeto = pj._atualizar(self.pid, drive_pasta=pasta, link=link, enviadas=[])
         fotos = fotos_da_pasta(projeto["pasta"])
