@@ -232,3 +232,37 @@ kbd { font: 600 10.5px "Montserrat"; background: var(--painel-3); border: 1px so
   .app { grid-template-columns: 290px minmax(0, 1fr) 310px; }
   .passos { display: none; }
 }
+
+/* ------------------------------------------------------------ clientes */
+.modos { display: flex; gap: 4px; margin-left: 26px; background: var(--painel); border: 1px solid var(--borda);
+  border-radius: 999px; padding: 3px; }
+.modos button { background: transparent; border: 0; border-radius: 999px; padding: 7px 16px; color: var(--suave); }
+.modos button.ativo { background: var(--botao); color: #1c0c00; }
+.clientes { display: grid; grid-template-columns: 360px minmax(0, 1fr); height: calc(100vh - 68px); }
+.bloco-fixo { background: var(--painel-2); border: 1px solid var(--borda); border-radius: var(--raio);
+  padding: 14px; margin-bottom: 12px; }
+.titulo-cartao { font-family: "Cinzel", serif; font-size: 13px; letter-spacing: .08em; margin: 0 0 8px;
+  text-transform: uppercase; }
+.lista-projetos { overflow-y: auto; padding: 22px 26px 90px; }
+.cabecalho-lista { display: flex; align-items: baseline; gap: 18px; margin-bottom: 16px; flex-wrap: wrap; }
+.titulo-pagina { font-family: "Cinzel", serif; font-weight: 400; letter-spacing: .08em; font-size: 22px; margin: 0; }
+.projeto { background: var(--painel-2); border: 1px solid var(--borda); border-radius: var(--raio);
+  padding: 16px 18px; margin-bottom: 12px; display: grid; gap: 10px; }
+.projeto .topo-projeto { display: flex; align-items: center; gap: 12px; }
+.projeto h4 { margin: 0; font-family: "Cinzel", serif; font-size: 16px; letter-spacing: .04em; color: var(--texto);
+  text-transform: none; }
+.projeto .sub { color: var(--suave); font-size: 12px; }
+.projeto .acoes { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.projeto input.link { flex: 1; min-width: 220px; font-size: 12px; color: var(--dourado); }
+.selo-estado { margin-left: auto; font-size: 11px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--borda);
+  color: var(--suave); white-space: nowrap; }
+.selo-estado.pronto { border-color: #1f5a37; color: var(--ok); }
+.selo-estado.enviando { border-color: #5a3a1a; color: var(--dourado); }
+.chave { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12.5px; }
+.chave input { display: none; }
+.chave i { width: 36px; height: 20px; border-radius: 999px; background: #333; position: relative; transition: background .2s; }
+.chave i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%;
+  background: #fff; transition: left .2s; }
+.chave input:checked + i { background: var(--laranja); }
+.chave input:checked + i::after { left: 19px; }
+.vazio-projetos { color: var(--suave); padding: 40px; text-align: center; border: 1px dashed var(--borda); border-radius: var(--raio); }

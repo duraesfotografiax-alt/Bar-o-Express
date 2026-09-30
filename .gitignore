@@ -3,3 +3,6 @@ __pycache__/
 .venv/
 .pytest_cache/
 duraesapp.log
+projetos.json
+google_cliente.json
+google_token.json

@@ -14,6 +14,10 @@
     <img src="/estatico/marca/simbolo.png" alt="Durães Fotografia">
     <div class="nome">Durães APP<small>EDIÇÃO EM LOTE COM IA</small></div>
   </div>
+  <nav class="modos">
+    <button class="ativo" data-modo="edicao" onclick="trocarModo('edicao')">Edição</button>
+    <button data-modo="clientes" onclick="trocarModo('clientes')">Clientes</button>
+  </nav>
   <nav class="passos" id="passos">
     <div class="passo atual" data-passo="1"><b>1</b>Fotos</div>
     <div class="passo" data-passo="2"><b>2</b>Estilo</div>
@@ -22,7 +26,7 @@
   <button class="btn-principal" id="btnProcessar" onclick="processar()">Editar todas as fotos</button>
 </header>
 
-<div class="app">
+<div class="app" id="telaEdicao">
   <!-- ====================================================== esquerda: fotos -->
   <aside class="lateral esq">
     <details class="bloco" open>
@@ -171,11 +175,62 @@
   </aside>
 </div>
 
+<!-- ====================================================== clientes (Google Drive) -->
+<div class="clientes" id="telaClientes" style="display:none">
+  <aside class="lateral esq">
+    <section class="bloco-fixo" id="cartaoDrive">
+      <h3 class="titulo-cartao">Google Drive</h3>
+      <div id="driveNaoConfigurado">
+        <p class="dica">Configuração única (uns 10 minutos). Siga o passo a passo do LEIA-ME, na
+          parte "Entrega para clientes", e escolha aqui o arquivo <b>.json</b> baixado do Google.</p>
+        <button class="destaque" style="width:100%" onclick="configurarDrive()">Escolher arquivo do Google (.json)</button>
+      </div>
+      <div id="driveDesconectado" style="display:none">
+        <p class="dica">Tudo configurado. Agora entre com a conta Google onde ficam as entregas.
+          O navegador vai abrir; depois de permitir, volte para cá.</p>
+        <button class="destaque" style="width:100%" onclick="entrarDrive()">Entrar com Google</button>
+      </div>
+      <div id="driveConectado" style="display:none">
+        <p class="dica"><span class="ok">● Conectado</span> <span id="driveConta"></span></p>
+        <button class="fantasma" onclick="sairDrive()">Sair da conta</button>
+      </div>
+      <p class="dica" id="driveMsg"></p>
+    </section>
+
+    <section class="bloco-fixo">
+      <h3 class="titulo-cartao">Novo projeto</h3>
+      <label>Cliente / evento</label>
+      <input type="text" id="pjNome" placeholder="Casamento Ana e João">
+      <label>Pasta com as fotos para entregar</label>
+      <div class="linha"><input type="text" id="pjPasta" placeholder="C:\Fotos\Casamento - Editadas">
+        <button onclick="escolherPastaProjeto()">Procurar</button></div>
+      <label>Tamanho das fotos no Drive</label>
+      <select id="pjTamanho">
+        <option value="original">Original (alta resolução)</option>
+        <option value="leve">Leve (3000 px, ocupa ~5x menos espaço)</option>
+      </select>
+      <label class="check"><input type="checkbox" id="pjDownload"> Cliente pode baixar as fotos</label>
+      <button class="destaque" style="width:100%; margin-top:6px" onclick="criarProjeto()">Criar e enviar para o Drive</button>
+      <p class="dica" id="pjMsg"></p>
+    </section>
+  </aside>
+
+  <main class="lista-projetos">
+    <div class="cabecalho-lista">
+      <h2 class="titulo-pagina">Projetos de entrega</h2>
+      <span class="dica">Com o download desligado, o cliente só vê as fotos: o Drive esconde os botões
+        de baixar e imprimir. Nenhum sistema impede print da tela.</span>
+    </div>
+    <div id="projetos"></div>
+  </main>
+</div>
+
 <div class="progresso" id="progresso">
   <div class="linha" style="justify-content:space-between">
     <span class="titulo" id="progTexto">Processando…</span>
     <span class="linha">
       <button id="btnAbrir" class="destaque" style="display:none" onclick="abrirSaida()">Abrir pasta</button>
+      <button id="btnEntrega" style="display:none" onclick="criarEntregaDoLote()">Criar entrega</button>
       <button id="btnCancelar" onclick="cancelar()">Cancelar</button>
       <button id="btnFechar" style="display:none" onclick="fecharProgresso()">Fechar</button>
     </span>

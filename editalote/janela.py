@@ -57,6 +57,7 @@ class Api:
         tipos = {
             "lut": ("LUT (*.cube)",),
             "lightroom": ("Preset ou foto do Lightroom (*.xmp;*.jpg;*.jpeg)",),
+            "json": ("ID do cliente Google (*.json)",),
         }
         if tipo in tipos:
             escolhido = self._janela.create_file_dialog(webview.FileDialog.OPEN, file_types=tipos[tipo])

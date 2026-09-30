@@ -15,6 +15,7 @@ import time
 FILTROS = {
     "lut": [("LUT", "*.cube")],
     "lightroom": [("Preset ou foto do Lightroom", "*.xmp *.jpg *.jpeg")],
+    "json": [("ID do cliente Google", "*.json")],
 }
 
 
@@ -66,7 +67,7 @@ def main(argv=None):
     proc.add_argument("--web", action="store_true", help="gera também versão 2048 px")
     proc.add_argument("--processos", type=int)
     escolher = sub.add_parser("_escolher", help=argparse.SUPPRESS)
-    escolher.add_argument("tipo", choices=["pasta", "lut", "lightroom"])
+    escolher.add_argument("tipo", choices=["pasta", "lut", "lightroom", "json"])
     escolher.add_argument("--saida")
     args = parser.parse_args(argv)
 

@@ -18,6 +18,8 @@ from flask import Flask, abort, jsonify, request, send_file, send_from_directory
 from PIL import Image
 
 from . import estilo_ia, nuvem
+from .drive import ErroDrive, Login
+from .projetos import Projetos
 from .lightroom import aprender, presets_instalados
 from .lote import OPCOES_PADRAO, Trabalho, resumo_pasta
 from .metadados import EXTENSOES
@@ -129,7 +131,7 @@ def padroes():
 def escolher():
     """Abre a janela nativa de escolher pasta/arquivo (num processo à parte)."""
     tipo = (request.json or {}).get("tipo", "pasta")
-    if tipo not in ("pasta", "lut", "lightroom"):
+    if tipo not in ("pasta", "lut", "lightroom", "json"):
         tipo = "pasta"
     descritor, resposta = tempfile.mkstemp(prefix="duraesapp-", suffix=".txt")
     os.close(descritor)
@@ -272,6 +274,143 @@ def cancelar():
     if _trabalho:
         _trabalho.cancelar()
     return jsonify({"ok": True})
+
+
+# ------------------------------------------------ entrega para clientes (Google Drive)
+
+projetos = Projetos(RAIZ)
+_login: Login | None = None
+
+
+def _erro(erro: Exception, codigo: int = 400):
+    return jsonify({"erro": str(erro)}), codigo
+
+
+@app.get("/api/drive/estado")
+def drive_estado():
+    return jsonify(projetos.conexao())
+
+
+@app.post("/api/drive/configurar")
+def drive_configurar():
+    caminho = (request.json or {}).get("caminho", "")
+    try:
+        projetos.configurar_cliente(caminho)
+    except (ErroDrive, OSError, ValueError) as erro:
+        return _erro(erro)
+    return jsonify(projetos.conexao())
+
+
+@app.post("/api/drive/entrar")
+def drive_entrar():
+    """Abre o login do Google no navegador; o Google devolve para /api/drive/retorno."""
+    global _login
+    try:
+        cliente = projetos.cliente()
+    except (ErroDrive, OSError, ValueError) as erro:
+        return _erro(erro)
+    if not cliente:
+        return _erro(ErroDrive("Configure o Google Drive primeiro (arquivo do ID do cliente)."))
+    porta = request.host.rsplit(":", 1)[-1]
+    _login = Login(cliente, f"http://127.0.0.1:{porta}/api/drive/retorno")
+    webbrowser.open(_login.url())
+    return jsonify({"ok": True})
+
+
+PAGINA_RETORNO = """<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Durães APP</title>
+<style>body{{background:#070707;color:#f5f5f5;font:16px system-ui;display:grid;place-items:center;height:100vh;margin:0}}
+div{{text-align:center;max-width:460px}}h1{{color:{cor};font-weight:600}}</style></head>
+<body><div><h1>{titulo}</h1><p>{texto}</p></div></body></html>"""
+
+
+@app.get("/api/drive/retorno")
+def drive_retorno():
+    if request.args.get("error"):
+        return PAGINA_RETORNO.format(cor="#ff6b5b", titulo="Login cancelado",
+                                     texto="Volte ao Durães APP e clique em Entrar com Google de novo.")
+    try:
+        if not _login:
+            raise ErroDrive("Login expirado. Clique em Entrar com Google de novo no Durães APP.")
+        token = _login.trocar_codigo(request.args.get("code", ""), request.args.get("state", ""))
+        projetos.salvar_token(token)
+        projetos.lembrar_conta(projetos.drive().conta())
+    except ErroDrive as erro:
+        log.warning("login Google: %s", erro)
+        return PAGINA_RETORNO.format(cor="#ff6b5b", titulo="Não deu certo", texto=str(erro))
+    return PAGINA_RETORNO.format(cor="#f4ba59", titulo="Pronto! Google Drive conectado",
+                                 texto="Pode fechar esta aba e voltar ao Durães APP.")
+
+
+@app.post("/api/drive/sair")
+def drive_sair():
+    projetos.sair()
+    projetos.lembrar_conta("")
+    return jsonify(projetos.conexao())
+
+
+@app.get("/api/projetos")
+def projetos_listar():
+    return jsonify(projetos.listar())
+
+
+@app.post("/api/projetos")
+def projetos_criar():
+    dados = request.json or {}
+    try:
+        projeto = projetos.criar(dados.get("nome", ""), dados.get("pasta", ""),
+                                 dados.get("tamanho", "original"), bool(dados.get("permitir_download")))
+        if dados.get("enviar", True):
+            projetos.enviar(projeto["id"])
+    except (ValueError, ErroDrive) as erro:
+        return _erro(erro)
+    return jsonify(projeto)
+
+
+@app.post("/api/projetos/<pid>/enviar")
+def projetos_enviar(pid):
+    try:
+        projetos.enviar(pid)
+    except (ValueError, ErroDrive, KeyError) as erro:
+        return _erro(erro)
+    return jsonify({"ok": True})
+
+
+@app.post("/api/projetos/<pid>/download")
+def projetos_download(pid):
+    try:
+        return jsonify(projetos.alterar_download(pid, bool((request.json or {}).get("permitir"))))
+    except (ErroDrive, KeyError) as erro:
+        return _erro(erro)
+
+
+@app.delete("/api/projetos/<pid>")
+def projetos_excluir(pid):
+    try:
+        projetos.excluir(pid, request.args.get("drive") == "1")
+    except (ValueError, ErroDrive, KeyError) as erro:
+        return _erro(erro)
+    return jsonify({"ok": True})
+
+
+@app.get("/api/projetos/envio")
+def projetos_envio():
+    return jsonify(projetos.status_envio())
+
+
+@app.post("/api/projetos/envio/cancelar")
+def projetos_cancelar():
+    projetos.cancelar_envio()
+    return jsonify({"ok": True})
+
+
+@app.post("/api/abrir-link")
+def abrir_link():
+    """Abre no navegador do computador só links de entrega (Drive e WhatsApp)."""
+    url = (request.json or {}).get("url", "")
+    if url.startswith(("https://drive.google.com/", "https://wa.me/")):
+        webbrowser.open(url)
+        return jsonify({"ok": True})
+    return _erro(ValueError("Link não permitido"))
 
 
 @app.post("/api/abrir-pasta")

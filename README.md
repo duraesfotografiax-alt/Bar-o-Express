@@ -22,9 +22,11 @@ editam cada tipo de foto no Lightroom e repete isso foto a foto.
 6. **Ajuste fino por câmera** para a Sony e a Canon ficarem com a mesma cor.
 7. **Separa as fotos possivelmente desfocadas** na pasta `_revisar_desfocadas`, comparando cada
    foto com as outras da mesma câmera.
-8. **Exporta renomeado** (`Casamento_Ana_Joao_0001.jpg`…), com versão leve opcional para
+8. **Entrega para clientes**: aba **Clientes** com um projeto por cliente no Google Drive, link para
+   mandar e chave para deixar baixar ou só visualizar.
+9. **Exporta renomeado** (`Casamento_Ana_Joao_0001.jpg`…), com versão leve opcional para
    WhatsApp/Instagram (pasta `web`), e um `relatorio.csv` que abre no Excel.
-9. **Entrega na nuvem**: salva as fotos editadas direto numa pasta do OneDrive/Google Drive/Dropbox,
+10. **Entrega na nuvem**: salva as fotos editadas direto numa pasta do OneDrive/Google Drive/Dropbox,
    pronta para compartilhar com o cliente.
 
 ## IA de estilo (foto a foto)
@@ -102,6 +104,54 @@ Depois de importar, confira no antes/depois e clique em **Salvar** para virar um
 
 O que **ainda não** é importado (o Durães APP avisa quando encontra): Remover névoa, Gradação de
 cor, Vinheta, Granulação, Redução de ruído e máscaras/ajustes locais.
+
+## Entrega para clientes (Google Drive)
+
+Na aba **Clientes** (botão no topo) vocês criam um **projeto por cliente**. O Durães APP envia as
+fotos para o Google Drive de vocês, dentro da pasta **"Durães APP · Clientes"**, e gera o **link**
+para mandar ao cliente.
+
+- **Cliente pode baixar**: a chave de cada projeto. Desligada, o cliente só **vê** as fotos: o Drive
+  esconde os botões de baixar, imprimir e copiar. Dá para ligar e desligar quando quiser, e o link
+  continua o mesmo. (Nenhum sistema impede um print da tela.)
+- **Copiar link** copia uma mensagem pronta para o cliente. **WhatsApp** abre o WhatsApp com essa
+  mensagem.
+- **Tamanho**: "Original" envia em alta resolução; "Leve" (3000 px) ocupa cerca de 5 vezes menos
+  espaço no Drive.
+- Se a internet cair, o envio para. **Continuar envio** manda só as fotos que faltaram.
+- **Excluir** tira o projeto da lista e pergunta se quer mandar a pasta do Drive para a lixeira (aí
+  o link deixa de funcionar).
+- Depois de editar um evento, o botão **Criar entrega** (no aviso de "pronto") já preenche o projeto
+  com as fotos editadas.
+- O Durães APP só enxerga no Drive **os arquivos que ele mesmo criou**. O resto do Drive fica
+  inacessível para ele.
+
+### Configuração única no Google (uns 10 minutos)
+
+O Google exige que um programa seja cadastrado antes de enviar arquivos para o Drive de alguém.
+Faça isso uma vez, com a conta Google do estúdio:
+
+1. Entre em <https://console.cloud.google.com>.
+2. No topo, clique em **Selecionar projeto > Novo projeto**. Nome: `Durães APP`. **Criar**.
+3. Menu ☰ > **APIs e serviços > Biblioteca**. Pesquise **Google Drive API** e clique em **Ativar**.
+4. Menu ☰ > **APIs e serviços > Tela de permissão OAuth** (em algumas contas aparece como
+   **Google Auth Platform**). Clique em **Começar**:
+   - Nome do app: `Durães APP`. E-mail de suporte: o de vocês.
+   - Público: **Externo**. Contato: o e-mail de vocês. Aceite e clique em **Criar**.
+   - Em **Público**, clique em **Publicar app** (fica "Em produção"). Sem isso o Google pede login
+     de novo a cada 7 dias.
+5. Menu ☰ > **APIs e serviços > Credenciais > Criar credenciais > ID do cliente OAuth**
+   (ou **Clientes > Criar cliente**):
+   - Tipo de aplicativo: **App para computador**. Nome: `Durães APP`. **Criar**.
+   - Clique em **Baixar JSON** e salve o arquivo.
+6. No Durães APP, aba **Clientes**: **Escolher arquivo do Google (.json)**, escolha o arquivo
+   baixado e depois clique em **Entrar com Google**.
+7. No navegador, escolha a conta do estúdio. Como o app é de vocês e não passou por revisão do
+   Google, ele avisa **"O Google não verificou este app"**: clique em **Avançado > Acessar Durães
+   APP** e depois em **Continuar**. Pronto.
+
+Guarde o arquivo .json com cuidado e não o compartilhe. Os arquivos `google_cliente.json` e
+`google_token.json` ficam ao lado do programa; apagar o `google_token.json` desconecta a conta.
 
 ## Entrega na nuvem
 
@@ -193,6 +243,8 @@ Estrutura:
 | `editalote/lut_cube.py` | leitura de LUTs `.cube` |
 | `editalote/metadados.py` | EXIF: câmera, número de série, horário |
 | `editalote/lightroom.py` | importa presets `.xmp` e edições salvas nas fotos |
+| `editalote/drive.py` | login no Google (OAuth com PKCE) e operações no Drive |
+| `editalote/projetos.py` | projetos de clientes: envio em segundo plano, link, download liberado ou não |
 | `editalote/nuvem.py` | acha as pastas do OneDrive/Google Drive/Dropbox para a entrega |
 | `editalote/lote.py` | ordem por horário, renomeação, processamento paralelo, desfocadas, relatório |
 | `editalote/estilo_ia.py` | IA de estilo pelas configurações do Lightroom (vizinhos mais próximos) |

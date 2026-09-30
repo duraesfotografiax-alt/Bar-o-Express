@@ -504,6 +504,7 @@ async function processar() {
   $("btnProcessar").disabled = true;
   $("progresso").style.display = "block";
   $("btnCancelar").style.display = ""; $("btnFechar").style.display = "none"; $("btnAbrir").style.display = "none";
+  $("btnEntrega").style.display = "none";
   poll = setInterval(acompanhar, 700);
 }
 function tempo(s) {
@@ -530,7 +531,7 @@ async function acompanhar() {
     clearInterval(poll);
     $("btnProcessar").disabled = false;
     $("btnCancelar").style.display = "none"; $("btnFechar").style.display = "";
-    if (s.estado === "concluido") $("btnAbrir").style.display = "";
+    if (s.estado === "concluido") { $("btnAbrir").style.display = ""; $("btnEntrega").style.display = ""; }
   }
 }
 async function cancelar() { await api("/api/cancelar", {}); }
@@ -570,6 +571,160 @@ async function saidaNaNuvem() {
   $("saida").value = r.caminho;
   $("nuvemMsg").textContent = "As editadas vão para: " + r.caminho +
     ". Atenção ao espaço: 2.000 fotos ocupam uns 10–16 GB (o Google Drive grátis tem 15 GB).";
+}
+
+// ------------------------------------------------------------------ clientes
+let pollEnvio = null, envioAtual = {};
+function trocarModo(modo) {
+  document.querySelectorAll(".modos button").forEach(b => b.classList.toggle("ativo", b.dataset.modo === modo));
+  $("telaEdicao").style.display = modo === "edicao" ? "" : "none";
+  $("telaClientes").style.display = modo === "clientes" ? "" : "none";
+  $("passos").style.display = modo === "edicao" ? "" : "none";
+  $("btnProcessar").style.display = modo === "edicao" ? "" : "none";
+  if (modo === "clientes") { atualizarDrive(); carregarProjetos(); acompanharEnvio(); }
+}
+async function atualizarDrive() {
+  const e = await api("/api/drive/estado");
+  $("driveNaoConfigurado").style.display = e.configurado ? "none" : "";
+  $("driveDesconectado").style.display = e.configurado && !e.conectado ? "" : "none";
+  $("driveConectado").style.display = e.conectado ? "" : "none";
+  $("driveConta").textContent = e.conta || "";
+  return e;
+}
+async function configurarDrive() {
+  const caminho = await dialogo("json");
+  if (!caminho) return;
+  try { await api("/api/drive/configurar", {caminho}); $("driveMsg").textContent = ""; }
+  catch (e) { $("driveMsg").innerHTML = `<span class="erro">${esc(e.message)}</span>`; }
+  atualizarDrive();
+}
+async function entrarDrive() {
+  try { await api("/api/drive/entrar", {}); }
+  catch (e) { $("driveMsg").innerHTML = `<span class="erro">${esc(e.message)}</span>`; return; }
+  $("driveMsg").textContent = "Termine o login no navegador que abriu…";
+  const t = setInterval(async () => {
+    const e = await atualizarDrive();
+    if (e.conectado) { clearInterval(t); $("driveMsg").textContent = ""; aviso("Google Drive conectado!"); }
+  }, 1500);
+  setTimeout(() => clearInterval(t), 5 * 60 * 1000);
+}
+async function sairDrive() {
+  if (!confirm("Sair da conta Google? Os projetos continuam no Drive; para mexer neles, entre de novo.")) return;
+  await api("/api/drive/sair", {});
+  atualizarDrive();
+}
+async function escolherPastaProjeto() {
+  const p = await dialogo("pasta");
+  if (p) $("pjPasta").value = p;
+}
+async function criarProjeto() {
+  const corpo = {nome: $("pjNome").value.trim(), pasta: $("pjPasta").value.trim(),
+                 tamanho: $("pjTamanho").value, permitir_download: $("pjDownload").checked};
+  try {
+    const e = await api("/api/drive/estado");
+    if (!e.conectado) throw new Error("Conecte o Google Drive primeiro (cartão acima).");
+    await api("/api/projetos", corpo);
+  } catch (e) { $("pjMsg").innerHTML = `<span class="erro">${esc(e.message)}</span>`; return; }
+  $("pjMsg").textContent = ""; $("pjNome").value = ""; $("pjPasta").value = "";
+  await carregarProjetos(); acompanharEnvio();
+}
+function mensagemCliente(p) {
+  return `Olá! As fotos de ${p.nome} estão prontas 📸\n` +
+    `${p.permitir_download ? "Você pode ver e baixar" : "Você pode ver"} todas aqui: ${p.link}\n\nDurães Fotografia`;
+}
+async function carregarProjetos() {
+  const lista = await api("/api/projetos");
+  if (!lista.length) {
+    $("projetos").innerHTML = `<div class="vazio-projetos">Nenhum projeto ainda. Crie o primeiro ao lado
+      (ou, depois de editar um evento, clique em <b>Criar entrega</b>).</div>`;
+    return;
+  }
+  $("projetos").innerHTML = lista.map(p => {
+    const enviando = envioAtual.estado === "enviando" && envioAtual.projeto === p.id;
+    const feitas = enviando ? envioAtual.feitas : p.enviadas.length;
+    const pronto = p.link && feitas >= p.total;
+    const selo = enviando ? `<span class="selo-estado enviando">Enviando ${feitas}/${p.total}</span>`
+      : pronto ? `<span class="selo-estado pronto">Pronto para enviar ao cliente</span>`
+      : `<span class="selo-estado">${feitas}/${p.total} fotos no Drive</span>`;
+    return `<div class="projeto" data-id="${p.id}">
+      <div class="topo-projeto"><div><h4>${esc(p.nome)}</h4>
+        <div class="sub">${esc(p.criado)} · ${p.total} fotos · ${p.tamanho === "leve" ? "versão leve" : "alta resolução"}</div></div>
+        ${selo}</div>
+      ${enviando ? `<div class="barra"><div style="width:${100 * feitas / Math.max(1, p.total)}%"></div></div>` : ""}
+      ${p.link ? `<div class="acoes">
+        <input class="link" type="text" readonly value="${esc(p.link)}" onclick="this.select()">
+        <button onclick="copiarLink('${p.id}')">Copiar link</button>
+        <button onclick="whatsapp('${p.id}')">WhatsApp</button>
+        <button class="fantasma" onclick="abrirLink('${esc(p.link)}')">Abrir no Drive</button></div>` : ""}
+      <div class="acoes">
+        <label class="chave"><input type="checkbox" ${p.permitir_download ? "checked" : ""}
+          onchange="alterarDownload('${p.id}', this)"><i></i> Cliente pode baixar</label>
+        <span style="margin-left:auto"></span>
+        ${!enviando && !pronto ? `<button class="contorno" onclick="enviarProjeto('${p.id}')">${p.link ? "Continuar envio" : "Enviar para o Drive"}</button>` : ""}
+        ${enviando ? `<button onclick="cancelarEnvio()">Pausar</button>` : ""}
+        <button class="fantasma" onclick="excluirProjeto('${p.id}')">Excluir</button>
+      </div></div>`;
+  }).join("");
+  window._projetos = Object.fromEntries(lista.map(p => [p.id, p]));
+}
+async function copiarLink(id) {
+  const p = window._projetos[id];
+  try { await navigator.clipboard.writeText(mensagemCliente(p)); }
+  catch (e) {
+    const campo = document.querySelector(`.projeto[data-id="${id}"] input.link`);
+    campo.value = mensagemCliente(p); campo.select(); document.execCommand("copy"); campo.value = p.link;
+  }
+  aviso("Mensagem com o link copiada. É só colar para o cliente.");
+}
+function whatsapp(id) {
+  abrirLink("https://wa.me/?text=" + encodeURIComponent(mensagemCliente(window._projetos[id])));
+}
+async function abrirLink(url) {
+  try { await api("/api/abrir-link", {url}); } catch (e) { aviso(e.message, true); }
+}
+async function alterarDownload(id, caixa) {
+  caixa.disabled = true;
+  try {
+    await api(`/api/projetos/${id}/download`, {permitir: caixa.checked});
+    aviso(caixa.checked ? "Agora o cliente pode baixar as fotos." : "Agora o cliente só pode ver as fotos.");
+  } catch (e) { caixa.checked = !caixa.checked; aviso(e.message, true); }
+  caixa.disabled = false;
+  carregarProjetos();
+}
+async function enviarProjeto(id) {
+  try { await api(`/api/projetos/${id}/enviar`, {}); } catch (e) { aviso(e.message, true); return; }
+  acompanharEnvio();
+}
+async function cancelarEnvio() { await api("/api/projetos/envio/cancelar", {}); }
+async function excluirProjeto(id) {
+  const p = window._projetos[id];
+  if (!confirm(`Excluir o projeto "${p.nome}" da lista?`)) return;
+  const doDrive = p.drive_pasta && confirm(
+    "Mover também a pasta do Drive para a lixeira? O link deixa de funcionar para o cliente.\n\n" +
+    "OK = mover para a lixeira do Drive · Cancelar = manter as fotos no Drive");
+  try {
+    const r = await fetch(`/api/projetos/${id}?drive=${doDrive ? 1 : 0}`, {method: "DELETE"});
+    if (!r.ok) throw new Error((await r.json()).erro);
+  } catch (e) { aviso(e.message, true); return; }
+  carregarProjetos();
+}
+function acompanharEnvio() {
+  clearInterval(pollEnvio);
+  pollEnvio = setInterval(async () => {
+    envioAtual = await api("/api/projetos/envio");
+    if (envioAtual.estado !== "enviando") {
+      clearInterval(pollEnvio);
+      if (envioAtual.mensagem && envioAtual.estado !== "parado")
+        aviso(envioAtual.mensagem, envioAtual.estado === "erro");
+    }
+    if ($("telaClientes").style.display !== "none") carregarProjetos();
+  }, 1200);
+}
+function criarEntregaDoLote() {
+  fecharProgresso();
+  trocarModo("clientes");
+  $("pjPasta").value = $("saida").value.trim();
+  $("pjNome").value = $("prefixo").value.replace(/_/g, " ");
 }
 
 // ------------------------------------------------------------------- início
