@@ -1,4 +1,4 @@
-"""Ponto de entrada do EditaLote.exe (PyInstaller)."""
+"""Ponto de entrada do DuraesApp.exe (PyInstaller)."""
 
 import multiprocessing
 import sys

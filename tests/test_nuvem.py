@@ -16,7 +16,7 @@ def test_ignora_pasta_que_nao_existe(tmp_path, monkeypatch):
 
 def test_pasta_de_entrega_limpa_o_nome(tmp_path):
     caminho = nuvem.pasta_entrega(str(tmp_path), 'Casamento Ana: "João"')
-    assert caminho == os.path.join(str(tmp_path), "EditaLote", "Entregas", "Casamento Ana_ _João_")
+    assert caminho == os.path.join(str(tmp_path), "Durães APP", "Entregas", "Casamento Ana_ _João_")
 
 
 def test_lista_presets_instalados_do_lightroom(tmp_path):

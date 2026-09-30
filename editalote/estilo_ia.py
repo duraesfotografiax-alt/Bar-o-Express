@@ -12,6 +12,7 @@ vocês deram nas fotos escuras de igreja; foto de festa ao ar livre, o das fotos
 from __future__ import annotations
 
 import json
+import logging
 import os
 import statistics
 import warnings
@@ -21,9 +22,11 @@ from functools import lru_cache
 import numpy as np
 from PIL import Image
 
-from .lightroom import _curva_mediana, converter, ler_crs
+from .lightroom import _curva_mediana, converter, ja_aplicada, ler_crs
 from .metadados import EXTENSOES
 from .processamento import PESOS_Y, carregar_reduzida, srgb_para_linear
+
+log = logging.getLogger("editalote.ia")
 
 VERSAO = 1
 VIZINHOS = 8
@@ -84,33 +87,58 @@ def caracteristicas_arquivo(caminho: str) -> np.ndarray:
 
 # ----------------------------------------------------------------- treino
 
-def _crs_da_foto(caminho: str) -> dict:
-    """Edição do Lightroom: embutida no JPEG ou num .xmp com o mesmo nome ao lado."""
-    crs = ler_crs(caminho)
-    if crs:
-        return crs
-    base = os.path.splitext(caminho)[0]
-    for ext in (".xmp", ".XMP"):
-        if os.path.isfile(base + ext):
-            return ler_crs(base + ext)
-    return {}
+def _sidecar(caminho: str, arquivos_da_pasta: dict[str, str]) -> str | None:
+    """Acha o .xmp da foto: IMG_1.xmp, IMG_1.XMP ou IMG_1.JPG.xmp (qualquer maiúscula/minúscula)."""
+    nome = os.path.basename(caminho).lower()
+    for candidato in (os.path.splitext(nome)[0] + ".xmp", nome + ".xmp"):
+        if candidato in arquivos_da_pasta:
+            return arquivos_da_pasta[candidato]
+    return None
 
 
-def _pares(pasta: str, limite: int):
+class Diagnostico:
+    """O que foi encontrado na pasta, para explicar quando o treino não acha edições."""
+
+    def __init__(self):
+        self.jpegs = self.xmps = self.com_edicao = self.ja_editadas = self.sem_edicao = 0
+
+    def texto(self) -> str:
+        partes = [f"{self.jpegs} fotos JPEG", f"{self.xmps} arquivos .xmp",
+                  f"{self.com_edicao} com edição do Lightroom"]
+        if self.ja_editadas:
+            partes.append(f"{self.ja_editadas} já exportadas com a edição aplicada (não servem)")
+        return "Encontrei " + ", ".join(partes) + "."
+
+
+def _pares(pasta: str, limite: int, diag: Diagnostico):
     for raiz, _, nomes in os.walk(pasta):
+        arquivos = {n.lower(): os.path.join(raiz, n) for n in nomes}
+        diag.xmps += sum(1 for n in arquivos if n.endswith(".xmp"))
         for nome in sorted(nomes):
             if os.path.splitext(nome)[1].lower() not in EXTENSOES:
                 continue
+            diag.jpegs += 1
             caminho = os.path.join(raiz, nome)
-            crs = _crs_da_foto(caminho)
-            if not crs:
+            try:
+                crs = ler_crs(caminho)
+                if not crs or not converter(crs)[0]:
+                    sidecar = _sidecar(caminho, arquivos)
+                    if sidecar:
+                        crs = ler_crs(sidecar)
+            except OSError:
+                crs = {}
+            if crs and ja_aplicada(crs):
+                diag.ja_editadas += 1
                 continue
-            ajustes, ignorados = converter(crs)
-            if ajustes:
-                yield caminho, ajustes, ignorados
-                limite -= 1
-                if limite <= 0:
-                    return
+            ajustes, ignorados = converter(crs) if crs else ({}, [])
+            if not ajustes:
+                diag.sem_edicao += 1
+                continue
+            diag.com_edicao += 1
+            yield caminho, ajustes, ignorados
+            limite -= 1
+            if limite <= 0:
+                return
 
 
 def _caracteristicas_seguro(caminho: str):
@@ -147,7 +175,9 @@ def treinar(pasta: str, nome: str = "Meu estilo", limite: int = 2500,
             progresso=None) -> dict:
     """Lê as fotos originais + edições do Lightroom e monta o modelo de estilo."""
     amostras, ignorados = [], set()
-    pares = list(_pares(pasta, limite))
+    diag = Diagnostico()
+    pares = list(_pares(pasta, limite, diag))
+    log.info("treino em %s: %s", pasta, diag.texto())
     processos = min(8, max(1, (os.cpu_count() or 2) - 1))
     with ProcessPoolExecutor(max_workers=processos) as executor:
         futuros = {executor.submit(_caracteristicas_seguro, c): (a, ign) for c, a, ign in pares}
@@ -160,11 +190,13 @@ def treinar(pasta: str, nome: str = "Meu estilo", limite: int = 2500,
             if progresso:
                 progresso(n, len(pares))
     if len(amostras) < 10:
-        raise ValueError(
-            f"Encontrei só {len(amostras)} fotos originais com edição do Lightroom (mínimo 10). "
-            "No Lightroom selecione as fotos editadas > Exportar > tipo \"Original + configurações\" "
-            "e escolha a pasta exportada."
-        )
+        dica = ("No Lightroom, selecione as fotos editadas > Exportar > tipo "
+                "\"Original + configurações\" e escolha a pasta exportada.")
+        if diag.ja_editadas:
+            dica = ("Essas fotos foram exportadas já editadas (JPG). A IA precisa das originais: "
+                    + dica)
+        raise ValueError(f"{diag.texto()} A IA precisa de pelo menos 10 fotos originais com a "
+                         f"edição do Lightroom. {dica}")
 
     x = np.array([a[0] for a in amostras])
     edicoes = [a[1] for a in amostras]
@@ -202,7 +234,24 @@ def treinar(pasta: str, nome: str = "Meu estilo", limite: int = 2500,
         "media": media.round(5).tolist(), "desvio": desvio.round(5).tolist(),
         "x": xz.round(4).tolist(), "y": y.round(3).tolist(),
         "base": base, "precisao": precisao, "ignorados": sorted(ignorados),
+        "diagnostico": diag.texto(),
     }
+
+
+def treinar_e_salvar(pasta: str, nome: str, pasta_presets: str, arquivo: str,
+                     progresso=None) -> dict:
+    """Treina e grava o modelo (presets/estilos/<arquivo>.json) e o preset que o usa."""
+    modelo = treinar(pasta, nome, progresso=progresso)
+    salvar(modelo, os.path.join(pasta_presets, "estilos", f"{arquivo}.json"))
+    preset = {**modelo["base"], "nome": nome, "estilo_ia": f"estilos/{arquivo}.json",
+              "ia_forca": 100, "auto_exposicao": 0, "auto_balanco_branco": 0}
+    os.makedirs(pasta_presets, exist_ok=True)
+    with open(os.path.join(pasta_presets, f"{arquivo}.json"), "w", encoding="utf-8") as f:
+        json.dump(preset, f, ensure_ascii=False, indent=2)
+    log.info("estilo %r treinado com %d fotos", nome, modelo["fotos"])
+    return {"arquivo": f"{arquivo}.json", "fotos": modelo["fotos"],
+            "diagnostico": modelo.get("diagnostico", ""),
+            "precisao": modelo["precisao"], "ignorados": modelo["ignorados"]}
 
 
 def salvar(modelo: dict, caminho: str) -> None:

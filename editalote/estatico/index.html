@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>EditaLote · Durães Fotografia</title>
+<title>Durães APP</title>
 <link rel="icon" href="/estatico/marca/icone.png">
 <link rel="stylesheet" href="/estatico/estilo.css">
 </head>
@@ -12,7 +12,7 @@
 <header class="topo">
   <div class="marca">
     <img src="/estatico/marca/simbolo.png" alt="Durães Fotografia">
-    <div class="nome">Durães Fotografia<small>EDITALOTE · EDIÇÃO EM LOTE</small></div>
+    <div class="nome">Durães APP<small>EDIÇÃO EM LOTE COM IA</small></div>
   </div>
   <nav class="passos" id="passos">
     <div class="passo atual" data-passo="1"><b>1</b>Fotos</div>
@@ -99,12 +99,15 @@
       <div id="iaTreino">
         <label>Nome do estilo</label>
         <input type="text" id="iaNome" value="Estilo Durães">
+        <label>Pasta exportada do Lightroom (Original + configurações)</label>
+        <div class="linha"><input type="text" id="iaPasta" placeholder="C:\Fotos\Casamento exportado">
+          <button onclick="escolherPastaIA()">Procurar</button></div>
         <button class="destaque" id="btnTreinar" style="width:100%; margin-top:8px" onclick="treinarIA()">Aprender meu estilo</button>
         <p class="dica" id="iaComo">No Lightroom: selecione as fotos editadas &gt; Exportar &gt; tipo
           <b>Original + configurações</b>. Depois escolha essa pasta aqui.</p>
       </div>
-      <div id="iaProgresso" style="display:none"><div class="barra"><div id="iaBarra"></div></div>
-        <p class="dica" id="iaStatus"></p></div>
+      <div id="iaProgresso" style="display:none"><div class="barra"><div id="iaBarra"></div></div></div>
+      <p class="dica" id="iaStatus"></p>
       <div id="iaForca" style="display:none">
         <div class="slider" title="0 = mesmo ajuste para todas; 100 = ajuste de cada foto como vocês fariam">
           <span>Ajuste por foto</span>

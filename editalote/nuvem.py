@@ -1,6 +1,6 @@
 """Entrega na nuvem: acha as pastas do OneDrive, Google Drive e Dropbox deste computador.
 
-O EditaLote não envia nada pela internet sozinho. Ele salva as fotos editadas numa pasta que o
+O Durães APP não envia nada pela internet sozinho. Ele salva as fotos editadas numa pasta que o
 programa da nuvem já sincroniza, e o próprio OneDrive/Google Drive/Dropbox faz o envio.
 """
 
@@ -46,6 +46,6 @@ def detectar_nuvens() -> list[dict]:
 
 
 def pasta_entrega(pasta_nuvem: str, nome_evento: str) -> str:
-    """<nuvem>/EditaLote/Entregas/<evento>, com um nome de pasta válido no Windows."""
+    """<nuvem>/Durães APP/Entregas/<evento>, com um nome de pasta válido no Windows."""
     nome = "".join("_" if c in '<>:"/\\|?*' else c for c in nome_evento).strip() or "Evento"
-    return os.path.join(pasta_nuvem, "EditaLote", "Entregas", nome)
+    return os.path.join(pasta_nuvem, "Durães APP", "Entregas", nome)

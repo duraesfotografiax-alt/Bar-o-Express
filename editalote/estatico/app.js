@@ -1,4 +1,4 @@
-// EditaLote · Durães Fotografia — comportamento da tela
+// Durães APP — comportamento da tela
 
 const GRUPOS = {
   slidersAuto: [
@@ -54,14 +54,23 @@ function aviso(texto, erro = false) {
   clearTimeout(timerAviso);
   timerAviso = setTimeout(() => a.style.display = "none", erro ? 7000 : 4500);
 }
-// Janela nativa do programa (pywebview) ou, no navegador, a janela do Windows via servidor
+// A janela do programa (pywebview) injeta window.pywebview.api um pouco depois de a tela abrir
+const apiJanelaPronta = new Promise(resolve => {
+  if (window.pywebview && window.pywebview.api) resolve(true);
+  window.addEventListener("pywebviewready", () => resolve(true));
+  setTimeout(() => resolve(false), 4000);  // no navegador comum ela não existe
+});
+// Janela de escolher pasta/arquivo: a do programa ou, como reserva, a do Windows via servidor
 async function dialogo(tipo) {
-  if (window.pywebview && window.pywebview.api) {
-    try { return await window.pywebview.api.escolher(tipo) || ""; } catch (e) { aviso(e.message || e, true); return ""; }
+  if (await apiJanelaPronta && window.pywebview?.api?.escolher) {
+    try { return await window.pywebview.api.escolher(tipo) || ""; }
+    catch (e) { console.error("janela do programa falhou; usando a reserva", e); }
   }
-  const r = await api("/api/escolher", {tipo});
-  if (r.erro) aviso(r.erro, true);
-  return r.caminho || "";
+  try {
+    const r = await api("/api/escolher", {tipo});
+    if (r.erro) aviso(r.erro, true);
+    return r.caminho || "";
+  } catch (e) { aviso("Não consegui abrir a janela de pastas. Digite o caminho no campo.", true); return ""; }
 }
 function passo(n) {
   document.querySelectorAll(".passo").forEach(p => {
@@ -144,23 +153,35 @@ function mostrarIA() {
     ? "IA ligada: cada foto recebe o ajuste que vocês dariam nela. Os controles abaixo são o padrão do estilo; mexer neles muda todas as fotos."
     : "Ensine a IA com um casamento que vocês já editaram no Lightroom. Ela aprende como vocês ajustam cada tipo de foto (igreja escura, festa, externa) e repete foto a foto.";
 }
-async function treinarIA() {
+async function escolherPastaIA() {
   const pasta = await dialogo("pasta");
-  if (!pasta) return;
+  if (pasta) $("iaPasta").value = pasta;
+  return pasta;
+}
+function statusIA(texto, erro = false) {
+  $("iaStatus").innerHTML = erro ? `<span class="erro">${esc(texto)}</span>` : esc(texto);
+}
+async function treinarIA() {
+  let pasta = $("iaPasta").value.trim();
+  if (!pasta) pasta = await escolherPastaIA();
+  if (!pasta) { statusIA("Escolha a pasta exportada do Lightroom (Original + configurações).", true); return; }
   try { await api("/api/estilo/treinar", {pasta, nome: $("iaNome").value.trim() || "Estilo Durães"}); }
-  catch (e) { aviso(e.message, true); return; }
+  catch (e) { statusIA(e.message, true); return; }
   $("iaTreino").style.display = "none"; $("iaProgresso").style.display = "";
-  $("iaStatus").textContent = "Procurando as fotos com edição do Lightroom…";
+  $("iaBarra").style.width = "0";
+  statusIA("Procurando as fotos com edição do Lightroom…");
   const t = setInterval(async () => {
-    const s = await api("/api/estilo/status");
+    let s;
+    try { s = await api("/api/estilo/status"); } catch (e) { return; }
     if (s.total) {
       $("iaBarra").style.width = (100 * s.feitas / s.total) + "%";
-      $("iaStatus").textContent = `Estudando as fotos: ${s.feitas} de ${s.total}`;
+      statusIA(`Estudando as fotos: ${s.feitas} de ${s.total}`);
     }
     if (s.estado === "concluido" || s.estado === "erro") {
       clearInterval(t);
       $("iaTreino").style.display = ""; $("iaProgresso").style.display = "none";
-      if (s.estado === "erro") { $("iaStatus").textContent = ""; aviso(s.erro, true); return; }
+      if (s.estado === "erro") { statusIA(s.erro, true); return; }
+      statusIA(s.resultado.diagnostico || "");
       await carregarPresets(s.resultado.arquivo);
       const p = s.resultado.precisao.exposicao;
       let txt = `Aprendido de ${s.resultado.fotos} fotos.`;

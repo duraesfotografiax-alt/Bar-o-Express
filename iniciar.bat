@@ -11,13 +11,13 @@ if not defined PY (
   echo.
   echo  Python nao encontrado.
   echo  Instale em https://www.python.org/downloads/ e marque "Add Python to PATH".
-  echo  Ou use o EditaLote.exe, que nao precisa de Python.
+  echo  Ou use o DuraesApp.exe, que nao precisa de Python.
   echo.
   pause
   exit /b 1
 )
 if not exist .venv\Scripts\python.exe (
-  echo Preparando o EditaLote pela primeira vez, aguarde...
+  echo Preparando o Duraes APP pela primeira vez, aguarde...
   %PY% -m venv .venv || goto erro
   .venv\Scripts\python -m pip install --upgrade pip >nul
   .venv\Scripts\python -m pip install -r requirements.txt || goto erro

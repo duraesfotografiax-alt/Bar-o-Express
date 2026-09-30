@@ -6,8 +6,10 @@ import io
 import json
 import os
 import re
+import logging
 import subprocess
 import sys
+import tempfile
 import threading
 import unicodedata
 import webbrowser
@@ -22,7 +24,7 @@ from .metadados import EXTENSOES
 from .processamento import AJUSTES_PADRAO, previa_jpeg
 
 if getattr(sys, "frozen", False):
-    # EditaLote.exe: presets ficam ao lado do .exe (dá para editar e salvar novos)
+    # DuraesApp.exe: presets ficam ao lado do .exe (dá para editar e salvar novos)
     RAIZ = os.path.dirname(sys.executable)
     PASTA_ESTATICA = os.path.join(sys._MEIPASS, "editalote", "estatico")  # type: ignore[attr-defined]
 else:
@@ -31,6 +33,7 @@ else:
 PASTA_PRESETS = os.path.join(RAIZ, "presets")
 
 app = Flask(__name__, static_folder=None)
+log = logging.getLogger("editalote")
 _trabalho: Trabalho | None = None
 _trava = threading.Lock()
 
@@ -69,19 +72,15 @@ class Treino:
 
     def executar(self):
         try:
-            modelo = estilo_ia.treinar(self.pasta, self.nome, progresso=self.progresso)
-            arquivo = _nome_arquivo(self.nome, "estilo")
-            estilo_ia.salvar(modelo, os.path.join(PASTA_PRESETS, "estilos", f"{arquivo}.json"))
-            preset = {**modelo["base"], "nome": self.nome, "estilo_ia": f"estilos/{arquivo}.json",
-                      "ia_forca": 100, "auto_exposicao": 0, "auto_balanco_branco": 0}
-            os.makedirs(PASTA_PRESETS, exist_ok=True)
-            with open(os.path.join(PASTA_PRESETS, f"{arquivo}.json"), "w", encoding="utf-8") as f:
-                json.dump(preset, f, ensure_ascii=False, indent=2)
-            self.resultado = {"arquivo": f"{arquivo}.json", "fotos": modelo["fotos"],
-                              "precisao": modelo["precisao"], "ignorados": modelo["ignorados"]}
+            self.resultado = estilo_ia.treinar_e_salvar(
+                self.pasta, self.nome, PASTA_PRESETS, _nome_arquivo(self.nome, "estilo"), self.progresso)
             self.estado = "concluido"
-        except Exception as erro:
+        except ValueError as erro:  # explicação para o usuário (ex.: não achou edições)
+            log.warning("treino: %s", erro)
             self.estado, self.erro = "erro", str(erro)
+        except Exception as erro:
+            log.exception("treino falhou")
+            self.estado, self.erro = "erro", f"Erro inesperado no treino: {erro}. Detalhes em duraesapp.log."
 
     def status(self) -> dict:
         return {"estado": self.estado, "feitas": self.feitas, "total": self.total,
@@ -128,18 +127,28 @@ def padroes():
 def escolher():
     """Abre a janela nativa de escolher pasta/arquivo (num processo à parte)."""
     tipo = (request.json or {}).get("tipo", "pasta")
-    if getattr(sys, "frozen", False):  # EditaLote.exe
-        comando = [sys.executable, "_escolher", tipo]
+    if tipo not in ("pasta", "lut", "lightroom"):
+        tipo = "pasta"
+    descritor, resposta = tempfile.mkstemp(prefix="duraesapp-", suffix=".txt")
+    os.close(descritor)
+    if getattr(sys, "frozen", False):  # DuraesApp.exe
+        comando = [sys.executable, "_escolher", tipo, "--saida", resposta]
     else:
-        comando = [sys.executable, "-m", "editalote", "_escolher", tipo]
+        comando = [sys.executable, "-m", "editalote", "_escolher", tipo, "--saida", resposta]
     try:
-        saida = subprocess.run(comando, capture_output=True, encoding="utf-8", timeout=600,
-                               env={**os.environ, "PYTHONIOENCODING": "utf-8"}, cwd=RAIZ,
-                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-        caminho = saida.stdout.strip().splitlines()[-1].strip() if saida.stdout.strip() else ""
+        subprocess.run(comando, timeout=600, cwd=RAIZ,
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        with open(resposta, encoding="utf-8") as f:
+            caminho = f.read().strip()
         return jsonify({"caminho": os.path.normpath(caminho) if caminho else ""})
     except Exception as erro:
+        log.exception("janela de escolher falhou")
         return jsonify({"caminho": "", "erro": f"Não consegui abrir a janela ({erro}). Digite o caminho."})
+    finally:
+        try:
+            os.remove(resposta)
+        except OSError:
+            pass
 
 
 @app.post("/api/lightroom")
@@ -278,7 +287,7 @@ def abrir_pasta():
 
 def iniciar(porta: int = 8765, abrir_navegador: bool = True):
     url = f"http://127.0.0.1:{porta}"
-    print(f"\n  EditaLote rodando em {url}\n  (deixe esta janela aberta; feche para encerrar)\n")
+    print(f"\n  Durães APP rodando em {url}\n  (deixe esta janela aberta; feche para encerrar)\n")
     if abrir_navegador:
         threading.Timer(1.0, lambda: webbrowser.open(url)).start()
     app.run(host="127.0.0.1", port=porta, debug=False, threaded=True)

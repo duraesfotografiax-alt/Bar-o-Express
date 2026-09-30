@@ -1,4 +1,4 @@
-# EditaLote · Durães Fotografia
+# Durães APP · Durães Fotografia
 
 Programa de PC para edição de fotos **em lote** em casamentos, aniversários e eventos. Ele edita
 1.500, 2.000 ou 3.000 JPEGs com o **estilo do estúdio** em poucos minutos, **sem perder qualidade**
@@ -36,13 +36,24 @@ de foto** e repete.
 1. No Lightroom, selecione as fotos de um casamento que vocês **já editaram** > **Exportar** >
    tipo **Original + configurações** > exporte para uma pasta.
    (No Lightroom Classic: selecione as fotos e use **Metadados > Salvar metadados no arquivo**.)
-2. No EditaLote, no cartão **IA · Estilo Durães**, dê um nome e clique em **Aprender meu estilo**.
+2. No Durães APP, no cartão **IA · Estilo Durães**, dê um nome e clique em **Aprender meu estilo**.
    Escolha a pasta exportada. Com 1.500 fotos leva poucos minutos.
 3. Pronto: aparece o preset **✦ Estilo Durães**. Em cada foto, a tela mostra o que a IA fez
    (ex.: "IA nesta foto: Exposição +0,35 · Temperatura −8").
    - **Ajuste por foto** (0–100) controla o quanto a IA varia de uma foto para outra.
    - Os controles do painel continuam valendo como o padrão do estilo. Mexer neles muda todas as fotos.
    - O `relatorio.csv` lista o ajuste da IA em cada foto.
+
+Se aparecer uma mensagem de erro no cartão da IA, ela diz o que foi encontrado na pasta:
+
+- **"0 com edição do Lightroom"**: a pasta não tem as edições. Confira se exportou com o tipo
+  **Original + configurações**. O Durães APP lê a edição dentro do JPEG ou num arquivo `.xmp` ao
+  lado da foto (`IMG_1.xmp` ou `IMG_1.JPG.xmp`), inclusive edições grandes com máscaras.
+- **"já exportadas com a edição aplicada"**: a pasta tem as fotos finais (JPG editado). A IA precisa
+  das **originais** com a edição separada, para comparar o antes com o que vocês fizeram.
+- Se a janela de escolher pasta não abrir, digite ou cole o caminho no campo **Pasta exportada do
+  Lightroom**.
+- Pelo terminal também dá: `DuraesApp.exe aprender "C:\Fotos\Exportado" --nome "Estilo Durães"`.
 
 Como funciona: para cada foto nova, a IA mede brilho, contraste, cor e ISO, procura as fotos do
 treino mais parecidas (os "vizinhos") e combina o que vocês fizeram nelas. Ao terminar o treino, ela
@@ -51,7 +62,7 @@ eventos no treino, melhor ela fica. Dá para treinar de novo a qualquer momento.
 
 ## Vindo do Lightroom
 
-O EditaLote tem as ferramentas que vocês mais usam no Lightroom: exposição, contraste, realces,
+O Durães APP tem as ferramentas que vocês mais usam no Lightroom: exposição, contraste, realces,
 sombras, brancos, pretos, temperatura, matiz, vibração, saturação, **claridade**, **textura**,
 **HSL / Cor** (matiz, saturação e luminância de 8 cores: pele = laranja, grama = verde/amarelo,
 céu = azul) e **curvas** (a de pontos, com R/G/B separados, e a curva por regiões). O botão
@@ -66,18 +77,18 @@ Em vez de montar o padrão do zero, tragam o que vocês já fazem no Lightroom:
 
 Depois de importar, confira no antes/depois e clique em **Salvar** para virar um preset.
 
-O que **ainda não** é importado (o EditaLote avisa quando encontra): Remover névoa, Gradação de
+O que **ainda não** é importado (o Durães APP avisa quando encontra): Remover névoa, Gradação de
 cor, Vinheta, Granulação, Redução de ruído e máscaras/ajustes locais.
 
 ## Entrega na nuvem
 
 No bloco **4. Entrega na nuvem** da tela, escolha a pasta do OneDrive, Google Drive para
-computador ou Dropbox (o EditaLote encontra sozinho; se não achar, use **Outra**) e clique em
+computador ou Dropbox (o Durães APP encontra sozinho; se não achar, use **Outra**) e clique em
 **Salvar as editadas na nuvem**. A pasta de saída passa a ser
-`…/EditaLote/Entregas/<nome do evento>`, e o programa da nuvem envia as fotos sozinho. Depois é só
+`…/Durães APP/Entregas/<nome do evento>`, e o programa da nuvem envia as fotos sozinho. Depois é só
 compartilhar essa pasta com o cliente pelo próprio OneDrive/Google Drive.
 
-- O EditaLote não pede senha nem conta: quem envia é o programa da nuvem instalado no computador.
+- O Durães APP não pede senha nem conta: quem envia é o programa da nuvem instalado no computador.
 - Atenção ao espaço: 2.000 fotos ocupam uns 10–16 GB (o Google Drive grátis tem 15 GB).
 - Os presets continuam só neste computador, na pasta `presets` ao lado do programa.
 - Se quiserem as editadas também no Lightroom da nuvem, é só importar a pasta de saída nele.
@@ -93,18 +104,18 @@ compartilhar essa pasta com o cliente pelo próprio OneDrive/Google Drive.
 
 ## Como usar (Windows)
 
-### Jeito mais fácil: EditaLote.exe (não precisa instalar nada)
+### Jeito mais fácil: DuraesApp.exe (não precisa instalar nada)
 
 1. Baixe a versão mais recente (link fixo, sempre a última):
-   <https://github.com/duraesfotografiax-alt/Bar-o-Express/releases/latest/download/EditaLote-Windows.zip>
-2. Extraia o .zip numa pasta (ex.: `C:\EditaLote`).
-3. Dê dois cliques em **`EditaLote.exe`**. O programa abre na própria janela.
+   <https://github.com/duraesfotografiax-alt/Bar-o-Express/releases/latest/download/DuraesApp-Windows.zip>
+2. Extraia o .zip numa pasta (ex.: `C:\DuraesApp`).
+3. Dê dois cliques em **`DuraesApp.exe`**. O programa abre na própria janela.
    (Se o Windows não tiver o componente WebView2 da Microsoft, ele abre no navegador e mostra uma
    janelinha para encerrar.)
    - Se o Windows mostrar "O Windows protegeu o computador", clique em **Mais informações >
      Executar assim mesmo** (o programa não tem assinatura digital paga).
-   - Dica: botão direito no `EditaLote.exe` > **Enviar para > Área de trabalho (criar atalho)**.
-   - Se algo der errado, mande o arquivo **`editalote.log`** (fica ao lado do `EditaLote.exe`).
+   - Dica: botão direito no `DuraesApp.exe` > **Enviar para > Área de trabalho (criar atalho)**.
+   - Se algo der errado, mande o arquivo **`duraesapp.log`** (fica ao lado do `DuraesApp.exe`).
 
 ### Com Python instalado
 
@@ -177,7 +188,7 @@ Estrutura:
 
 ## Publicar uma nova versão
 
-No GitHub: **Actions** > **Windows (testes e EditaLote.exe)** > **Run workflow**, escolha a branch
+No GitHub: **Actions** > **Windows (testes e DuraesApp.exe)** > **Run workflow**, escolha a branch
 e preencha a versão (ex.: `v0.3.0`). Enviar uma tag `v0.3.0` tem o mesmo efeito. O GitHub testa no
-Windows, gera o `EditaLote-Windows.zip` e publica em **Releases**. O link
-`releases/latest/download/EditaLote-Windows.zip` passa a apontar para essa versão.
+Windows, gera o `DuraesApp-Windows.zip` e publica em **Releases**. O link
+`releases/latest/download/DuraesApp-Windows.zip` passa a apontar para essa versão.

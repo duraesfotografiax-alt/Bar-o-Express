@@ -18,8 +18,11 @@ FILTROS = {
 }
 
 
-def escolher_com_janela(tipo: str) -> int:
-    """Abre a janela do Windows para escolher pasta/arquivo e imprime o caminho."""
+def escolher_com_janela(tipo: str, arquivo_saida: str | None = None) -> int:
+    """Abre a janela do Windows para escolher pasta/arquivo e devolve o caminho.
+
+    O caminho vai para arquivo_saida (funciona até no .exe sem console) ou para a saída padrão.
+    """
     import tkinter
     from tkinter import filedialog
 
@@ -31,7 +34,11 @@ def escolher_com_janela(tipo: str) -> int:
     else:
         caminho = filedialog.askdirectory(parent=raiz)
     raiz.destroy()
-    sys.stdout.write((caminho or "") + "\n")
+    if arquivo_saida:
+        with open(arquivo_saida, "w", encoding="utf-8") as f:
+            f.write(caminho or "")
+    elif sys.stdout:
+        sys.stdout.write((caminho or "") + "\n")
     return 0
 
 
@@ -40,9 +47,13 @@ def main(argv=None):
     sub = parser.add_subparsers(dest="comando")
     janela = sub.add_parser("janela", help="abre o programa em janela própria (padrão)")
     janela.add_argument("--porta", type=int)
+    janela.add_argument("--autoteste", action="store_true", help=argparse.SUPPRESS)
     tela = sub.add_parser("tela", help="abre a interface no navegador")
     tela.add_argument("--porta", type=int, default=8765)
     tela.add_argument("--sem-navegador", action="store_true")
+    aprender = sub.add_parser("aprender", help="treina a IA de estilo com uma pasta do Lightroom")
+    aprender.add_argument("pasta", help="pasta exportada: Original + configurações")
+    aprender.add_argument("--nome", default="Estilo Durães")
     proc = sub.add_parser("processar", help="processa uma pasta direto pelo terminal")
     proc.add_argument("entrada")
     proc.add_argument("saida")
@@ -54,10 +65,27 @@ def main(argv=None):
     proc.add_argument("--processos", type=int)
     escolher = sub.add_parser("_escolher", help=argparse.SUPPRESS)
     escolher.add_argument("tipo", choices=["pasta", "lut", "lightroom"])
+    escolher.add_argument("--saida")
     args = parser.parse_args(argv)
 
     if args.comando == "_escolher":
-        return escolher_com_janela(args.tipo)
+        return escolher_com_janela(args.tipo, args.saida)
+
+    if args.comando == "aprender":
+        from .estilo_ia import treinar_e_salvar
+        from .janela import configurar_log
+        from .servidor import PASTA_PRESETS, RAIZ, _nome_arquivo
+
+        configurar_log(RAIZ)
+        try:
+            r = treinar_e_salvar(args.pasta, args.nome, PASTA_PRESETS, _nome_arquivo(args.nome, "estilo"))
+        except ValueError as erro:
+            print(erro)
+            return 2
+        print(f"{r['diagnostico']} Estilo salvo em presets/{r['arquivo']} ({r['fotos']} fotos).")
+        for chave, p in r["precisao"].items():
+            print(f"  {chave}: erro da IA {p['erro_ia']} (ajuste fixo: {p['erro_sem_ia']})")
+        return 0
 
     if args.comando == "processar":
         from .lote import Trabalho
@@ -89,7 +117,8 @@ def main(argv=None):
         from .janela import abrir
         from .servidor import RAIZ
 
-        return abrir(getattr(args, "porta", None), pasta_log=RAIZ)
+        return abrir(getattr(args, "porta", None), pasta_log=RAIZ,
+                     autoteste=getattr(args, "autoteste", False))
 
     from .servidor import iniciar
 
