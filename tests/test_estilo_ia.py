@@ -1,3 +1,4 @@
+import json
 import numpy as np
 import pytest
 from PIL import Image, ImageFilter
@@ -179,5 +180,5 @@ def test_comando_aprender(tmp_path, monkeypatch):
     monkeypatch.setattr(servidor, "PASTA_PRESETS", str(tmp_path / "presets"))
     monkeypatch.setattr(servidor, "RAIZ", str(tmp_path))
     assert cli.main(["aprender", str(tmp_path / "exportado"), "--nome", "Estilo Durães"]) == 0
-    assert (tmp_path / "presets" / "estilo-duraes.json").is_file()
-    assert (tmp_path / "presets" / "estilos" / "estilo-duraes.json").is_file()
+    preset = json.loads((tmp_path / "presets" / "estilo-duraes.json").read_text(encoding="utf-8"))
+    assert preset["auto_tom"] == 100 and set(preset["auto_alvo"]) >= {"meio", "preto", "branco"}

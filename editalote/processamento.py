@@ -10,6 +10,7 @@ rápido (~1 s por foto de 24 MP) e sem perda acumulada de qualidade.
 from __future__ import annotations
 
 import io
+import os
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -406,10 +407,10 @@ def montar_lut(ajustes: dict, analise: Analise | None,
 
 
 def aplicar(img: Image.Image, ajustes: dict, analise: Analise | None,
-            lut: LutCube | None = None) -> Image.Image:
+            lut: LutCube | None = None, tamanho_lut: int = TAMANHO_LUT) -> Image.Image:
     if img.mode != "RGB":
         img = img.convert("RGB")
-    saida = img.filter(montar_lut(ajustes, analise, lut))
+    saida = img.filter(montar_lut(ajustes, analise, lut, tamanho_lut))
     claridade = float(ajustes.get("claridade", 0) or 0) / 100.0
     if claridade:
         saida = contraste_local(saida, 0.7 * claridade, lado=600, raio_rel=0.01, so_meios_tons=True)
@@ -471,10 +472,25 @@ def previa_jpeg(caminho: str, ajustes: dict, lado: int = 1400) -> tuple[bytes, d
 
     ajustes, ajuste_auto = aplicar_auto(ajustes, caminho)
     ajuste_ia = {**ajuste_ia, **ajuste_auto}
-    reduzida = carregar_reduzida(caminho)
-    analise = analisar(reduzida)
-    reduzida.thumbnail((lado, lado), Image.Resampling.LANCZOS)
-    editada = aplicar(reduzida, ajustes, analise, carregar_lut(ajustes))
+    reduzida, analise = _reduzida_da_previa(caminho, lado)
+    # LUT de 33 pontos na prévia: 8x mais rápida de montar e sem diferença visível na tela
+    editada = aplicar(reduzida, ajustes, analise, carregar_lut(ajustes), tamanho_lut=33)
     buf = io.BytesIO()
-    editada.save(buf, "JPEG", quality=90)
+    editada.save(buf, "JPEG", quality=88)
     return buf.getvalue(), ajuste_ia
+
+
+_cache_previa: dict = {}
+
+
+def _reduzida_da_previa(caminho: str, lado: int) -> tuple[Image.Image, Analise]:
+    """Foto reduzida e análise ficam guardadas: mexer num controle não reabre o JPEG do disco."""
+    chave = (caminho, os.path.getmtime(caminho), lado)
+    if chave not in _cache_previa:
+        reduzida = carregar_reduzida(caminho, max(lado, 1000))
+        analise = analisar(reduzida)
+        reduzida.thumbnail((lado, lado), Image.Resampling.LANCZOS)
+        if len(_cache_previa) >= 6:
+            _cache_previa.pop(next(iter(_cache_previa)))
+        _cache_previa[chave] = (reduzida, analise)
+    return _cache_previa[chave]

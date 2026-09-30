@@ -124,7 +124,7 @@ function resetar(k) { ajustes[k] = (k === "lut_intensidade") ? 100 : 0; mostrarA
 async function carregarPresets(selecionar) {
   presets = await api("/api/presets");
   $("preset").innerHTML = presets.map((p, i) =>
-    `<option value="${i}">${p.estilo_ia ? "✦ " : ""}${esc(p.nome)}</option>`).join("");
+    `<option value="${i}">${p.estilo_ia || p.auto_alvo || p.arquivo === "00-duraes-ia.json" ? "✦ " : ""}${esc(p.nome)}</option>`).join("");
   const i = selecionar ? presets.findIndex(p => p.arquivo === selecionar) : 0;
   $("preset").value = Math.max(0, i);
   usarPreset();
@@ -150,9 +150,9 @@ const COMO_IA = {
     "e a pasta das MESMAS fotos editadas e entregues. A IA compara cada par e aprende o contraste, a curva, " +
     "a exposição e a cor exatos de vocês. Os nomes dos arquivos precisam ser iguais nas duas pastas " +
     "(ou as finais precisam manter a data/hora da foto). Quanto mais pares, melhor (ideal: 200 ou mais).",
-  referencia: "Escolha uma pasta com 30 a 100 fotos que vocês já entregaram, de momentos diferentes " +
-    "(making of, cerimônia, externa, festa). Pode ser a pasta de entrega de um casamento. " +
-    "Não precisa do Lightroom nem das fotos originais.",
+  referencia: "Escolha UMA pasta com fotos que vocês já entregaram (pode ser a entrega de um casamento). " +
+    "A IA mede o jeito delas (claridade, contraste, pretos, brancos, cor) e cria um preset: em cada foto " +
+    "nova ela analisa e edita sozinha até ficar nesse jeito. Não precisa das originais.",
   lightroom: "No Lightroom: selecione as fotos editadas > Exportar > tipo Original + configurações. " +
     "Depois escolha essa pasta aqui.",
 };
@@ -169,10 +169,15 @@ async function escolherPastaFinais() {
   if (p) $("iaPastaFinais").value = p;
 }
 function alternarAuto() {
-  ajustes.auto_tom = +(ajustes.auto_tom || 0) > 0 ? 0 : 100;
+  const ligar = !(+(ajustes.auto_tom || 0) > 0);
+  ajustes.auto_tom = ligar ? 100 : 0;
+  let extra = "";
+  if (ligar && ajustes.estilo_ia && +(ajustes.ia_forca ?? 100) > 0) {
+    ajustes.ia_forca = 0;           // a IA treinada e o Auto fariam o mesmo trabalho
+    extra = " (a IA treinada deste preset foi desligada)";
+  }
   mostrarAjustes(); mudou();
-  aviso(ajustes.auto_tom ? (ajustes.estilo_ia ? "Auto ligado, mas a IA de estilo tem prioridade neste preset."
-    : "Auto ligado: cada foto é acertada sozinha.") : "Auto desligado.");
+  aviso(ligar ? "✦ IA automática ligada: cada foto é analisada e acertada sozinha" + extra : "Auto desligado");
 }
 function mostrarIA() {
   const ativo = !!ajustes.estilo_ia;
@@ -182,7 +187,7 @@ function mostrarIA() {
   $("btnTreinar").className = ativo ? "contorno" : "destaque";
   $("iaInfo").textContent = ativo
     ? "IA ligada: cada foto recebe o ajuste que vocês dariam nela. Os controles abaixo são o padrão do estilo; mexer neles muda todas as fotos."
-    : "Ensine a IA com um casamento que vocês já editaram no Lightroom. Ela aprende como vocês ajustam cada tipo de foto (igreja escura, festa, externa) e repete foto a foto.";
+    : "Já vem pronta: o preset ✦ Durães IA (automática) analisa e edita cada foto sozinho, no jeito das fotos finais da Durães. Opcional: ensine outro jeito com uma pasta de fotos prontas.";
 }
 async function escolherPastaIA() {
   const pasta = await dialogo("pasta");
@@ -429,7 +434,8 @@ function selecionar(img) {
     <div class="carregando" id="carregando"></div>`;
   $("imgAntes").onload = () => posicionar(0.5);
   ligarArraste();
-  atualizarPrevia();
+  ajustesMostrados = null;
+  pedirPrevia();
 }
 function trocarFoto(passoFoto) {
   const fotos = [...document.querySelectorAll("#amostras img")];
@@ -459,16 +465,41 @@ function ligarArraste() {
 }
 window.addEventListener("resize", () => { const c = $("comparar"); if (c) posicionar(+c.dataset.f || 0.5); });
 
+// Prévia rápida: enquanto arrasta, a imagem já muda na hora (filtro da tela) e o programa
+// calcula a versão exata em seguida; nunca fica uma fila de prévias esperando.
+let previaRodando = false, previaPendente = false, ajustesMostrados = null;
 function mudou() {
+  filtroInstantaneo();
   clearTimeout(timer);
-  timer = setTimeout(atualizarPrevia, 220);
+  timer = setTimeout(pedirPrevia, 15);
+}
+async function pedirPrevia() {
+  if (previaRodando) { previaPendente = true; return; }
+  previaRodando = true;
+  try { await atualizarPrevia(); } finally {
+    previaRodando = false;
+    if (previaPendente) { previaPendente = false; pedirPrevia(); }
+  }
+}
+function filtroInstantaneo() {
+  const d = $("imgDepois");
+  if (!d || !ajustesMostrados) return;
+  const dif = k => (+ajustes[k] || 0) - (+ajustesMostrados[k] || 0);
+  const luz = 2 ** (0.55 * dif("exposicao")) * (1 + 0.002 * (dif("brancos") + dif("sombras") * 0.5));
+  const contraste = 1 + 0.006 * dif("contraste") + 0.002 * (dif("claridade") - dif("pretos"));
+  const sat = Math.max(0, 1 + 0.009 * dif("saturacao") + 0.006 * dif("vibracao"));
+  const temp = dif("temperatura"), matiz = dif("matiz");
+  const partes = [`brightness(${luz.toFixed(3)})`, `contrast(${contraste.toFixed(3)})`, `saturate(${sat.toFixed(3)})`];
+  if (temp > 0) partes.push(`sepia(${Math.min(0.5, temp / 250).toFixed(3)})`);
+  if (temp < 0 || matiz) partes.push(`hue-rotate(${(Math.min(0, temp) * -0.12 + matiz * 0.1).toFixed(1)}deg)`);
+  d.style.filter = partes.join(" ");
 }
 function textoIA(dif) {
   const partes = Object.entries(dif).map(([k, v]) => {
     const sinal = v > 0 ? "+" : "−";
     return `${NOMES[k] || k} <b>${sinal}${num(Math.abs(v), k === "exposicao" ? 2 : 0)}</b>`;
   });
-  const quem = ajustes.estilo_ia ? "IA" : "Auto";
+  const quem = ajustes.estilo_ia && +(ajustes.ia_forca ?? 100) > 0 ? "IA treinada" : "IA automática";
   return partes.length ? `✦ ${quem} nesta foto: ` + partes.join(" · ") : `✦ ${quem}: esta foto já está no ponto`;
 }
 async function atualizarPrevia() {
@@ -476,8 +507,9 @@ async function atualizarPrevia() {
   if (!fotoAtual) return;
   const alvo = fotoAtual;
   $("carregando") && ($("carregando").style.display = "block");
+  const pedidos = structuredClone(ajustes);
   const r = await fetch("/api/previa", {method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({caminho: alvo, ajustes, lado: 1600})});
+    body: JSON.stringify({caminho: alvo, ajustes: pedidos, lado: 1600})});
   if ($("carregando")) $("carregando").style.display = "none";
   if (!r.ok) { aviso((await r.json()).erro, true); return; }
   let dif = {};
@@ -487,9 +519,17 @@ async function atualizarPrevia() {
   const chip = $("chipIA");
   chip.style.display = (ajustes.estilo_ia && +(ajustes.ia_forca ?? 100) > 0) || +(ajustes.auto_tom || 0) > 0 ? "block" : "none";
   chip.innerHTML = textoIA(dif);
-  const d = $("imgDepois"), velho = d.src;
-  d.onload = () => { if (velho) URL.revokeObjectURL(velho); posicionar(+$("comparar").dataset.f || 0.5); };
-  d.src = url;
+  const d = $("imgDepois"), velho = d.src, enviados = pedidos;
+  await new Promise(pronto => {
+    d.onload = d.onerror = () => {
+      if (velho) URL.revokeObjectURL(velho);
+      ajustesMostrados = enviados;
+      filtroInstantaneo();          // só sobra filtro se o controle mudou de novo nesse meio tempo
+      posicionar(+$("comparar").dataset.f || 0.5);
+      pronto();
+    };
+    d.src = url;
+  });
 }
 
 // Atalhos: ← → trocam de foto; segurar Espaço mostra só o "antes"

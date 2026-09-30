@@ -85,7 +85,7 @@ jobs:
           if ($p.ExitCode -ne 0) { exit 1 }
           if ((Get-ChildItem saida-ref -Filter *.jpg).Count -ne 12) { exit 1 }
           Get-Content saida-ref/relatorio.csv -TotalCount 3
-          Remove-Item -Recurse dist/DuraesApp/presets/estilos, dist/DuraesApp/presets/referencia.json, dist/DuraesApp/duraesapp.log
+          Remove-Item dist/DuraesApp/presets/referencia.json, dist/DuraesApp/duraesapp.log
 
       - name: Testar a IA por pares dentro do .exe (originais + finais)
         shell: pwsh

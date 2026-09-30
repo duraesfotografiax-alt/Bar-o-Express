@@ -71,6 +71,18 @@ No Lightroom, selecione as fotos de um casamento que vocês **já editaram** > *
 use **Metadados > Salvar metadados no arquivo**.) A IA aprende os valores dos controles que vocês
 usaram em cada tipo de foto e repete.
 
+### ✦ Durães IA (automática) — já vem pronta, sem treino
+
+É o primeiro preset da lista. Em **cada foto** a IA mede brilho, pretos, brancos, contraste, cor
+da luz e saturação e calcula a edição que leva aquela foto até o jeito das fotos finais da Durães:
+foto escura clareia, foto lavada ganha pretos e contraste, foto azulada esquenta, vestido estourado
+recupera. Os controles da tela continuam valendo por cima (ex.: +10 de contraste deixa todas um
+pouco mais fortes que o padrão).
+
+Para copiar outro jeito (ex.: um cliente que quer mais claro), use **Aprender com: Copiar o jeito
+de fotos prontas** e escolha **uma** pasta com fotos já editadas: nasce um preset novo com a IA
+automática mirando nesse jeito.
+
 ### Botão Auto (como o do Lightroom)
 
 Na aba **Básico**, o botão **Auto** acerta cada foto sozinha, sem treino: balanço de branco pelo

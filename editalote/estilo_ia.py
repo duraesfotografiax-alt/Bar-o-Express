@@ -265,17 +265,36 @@ def treinar_e_salvar(pasta: str, nome: str, pasta_presets: str, arquivo: str,
         return {"arquivo": f"{arquivo}.json", "fotos": modelo["fotos"], "modo": modo,
                 "diagnostico": modelo["diagnostico"], "precisao": {}, "ignorados": []}
     if modo == "referencia":
-        from . import estilo_referencia
+        # copia o "jeito" das fotos prontas para a IA automática (não precisa das originais)
+        from .auto_tom import medir_estilo
+        from .metadados import EXTENSOES
 
-        modelo = estilo_referencia.treinar(pasta, nome, progresso=progresso)
-        estilo_referencia.salvar(modelo, os.path.join(pasta_presets, "estilos", f"{arquivo}.json"))
-        preset = {"nome": nome, "estilo_ia": f"estilos/{arquivo}.json", "ia_forca": 100,
-                  "auto_exposicao": 0, "auto_balanco_branco": 0}
+        arquivos = []
+        for raiz, _, nomes in os.walk(pasta):
+            arquivos += [os.path.join(raiz, n) for n in sorted(nomes)
+                         if os.path.splitext(n)[1].lower() in EXTENSOES]
+        if len(arquivos) > 200:  # 200 fotos espalhadas pelo evento bastam
+            arquivos = [arquivos[int(i)] for i in np.linspace(0, len(arquivos) - 1, 200)]
+        fotos = []
+        for n, caminho in enumerate(arquivos, 1):
+            try:
+                fotos.append(np.asarray(carregar_reduzida(caminho, 300), dtype=np.float64) / 255.0)
+            except Exception:
+                log.exception("não consegui ler %s", caminho)
+            if progresso:
+                progresso(n, len(arquivos))
+        diagnostico = f"Encontrei {len(arquivos)} fotos e usei {len(fotos)}."
+        if not fotos:
+            raise ValueError(f"{diagnostico} Escolha uma pasta com fotos JPEG prontas (editadas).")
+        alvo = medir_estilo(fotos)
+        preset = {"nome": nome, "auto_tom": 100, "auto_alvo": alvo, "auto_exposicao": 0,
+                  "auto_balanco_branco": 0, "nitidez": 10}
+        os.makedirs(pasta_presets, exist_ok=True)
         with open(os.path.join(pasta_presets, f"{arquivo}.json"), "w", encoding="utf-8") as f:
             json.dump(preset, f, ensure_ascii=False, indent=2)
-        log.info("estilo %r aprendido de %d fotos finais", nome, modelo["fotos"])
-        return {"arquivo": f"{arquivo}.json", "fotos": modelo["fotos"], "modo": modo,
-                "diagnostico": modelo["diagnostico"], "precisao": {}, "ignorados": []}
+        log.info("jeito %r copiado de %d fotos: %s", nome, len(fotos), alvo)
+        return {"arquivo": f"{arquivo}.json", "fotos": len(fotos), "modo": modo,
+                "diagnostico": diagnostico, "precisao": {}, "ignorados": []}
     modelo = treinar(pasta, nome, progresso=progresso)
     salvar(modelo, os.path.join(pasta_presets, "estilos", f"{arquivo}.json"))
     preset = {**modelo["base"], "nome": nome, "estilo_ia": f"estilos/{arquivo}.json",

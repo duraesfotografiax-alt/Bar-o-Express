@@ -91,3 +91,16 @@ def test_auto_desligado_ou_com_ia_nao_mexe(tmp_path):
     com_ia = {**base, "auto_tom": 100, "estilo_ia": "estilos/x.json"}
     assert aplicar_auto(com_ia, str(caminho))[1] == {}
     assert "curva_ref" in calcular(np.asarray(cena_final(1), dtype=float) / 255)
+
+
+def test_auto_segue_o_alvo_das_fotos_prontas(tmp_path):
+    from editalote.auto_tom import medir_estilo
+
+    escura = Image.fromarray((np.asarray(cena_final(5), dtype=float) * 0.45).astype(np.uint8))
+    caminho = tmp_path / "escura.jpg"
+    escura.save(caminho, quality=95)
+    clara = medir_estilo([np.asarray(cena_final(i), dtype=float) / 255 for i in range(3)])
+    clara["meio"] = 0.6
+    ajustes, _ = aplicar_auto(completar_ajustes({"auto_tom": 100, "auto_alvo": clara}), str(caminho))
+    saida = np.asarray(aplicar(escura, ajustes, None), dtype=float) / 255
+    assert np.median(saida @ [0.2126, 0.7152, 0.0722]) > 0.45
