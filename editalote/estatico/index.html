@@ -78,6 +78,10 @@
   .canais { display: flex; gap: 4px; margin-bottom: 6px; }
   .canais button { padding: 3px 10px; font-size: 12px; }
   .canais button.ativo { border-color: var(--destaque); color: var(--destaque); }
+  .cores { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin-bottom: 6px; }
+  .cores button { height: 24px; padding: 0; border-radius: 50%; border: 2px solid transparent; }
+  .cores button.ativo { border-color: #fff; }
+  .nuvem-ok { color: var(--ok); }
   .ok { color: var(--ok); }
   @media (max-width: 800px) {
     main { grid-template-columns: 1fr; height: auto; }
@@ -96,7 +100,8 @@
         <button onclick="escolher('entrada')">Procurar</button></div>
       <label>Salvar as fotos editadas em</label>
       <div class="linha"><input type="text" id="saida" placeholder="C:\Fotos\Casamento Ana e João - Editadas">
-        <button onclick="escolher('saida')">Procurar</button></div>
+        <button onclick="escolher('saida')">Procurar</button>
+        <button onclick="saidaNaNuvem()" title="Salvar as editadas na pasta da nuvem (seção 5)">Nuvem</button></div>
       <div class="linha" style="margin-top:8px"><button onclick="escanear()">Carregar fotos</button>
         <span id="resumo" class="dica"></span></div>
     </section>
@@ -117,8 +122,14 @@
         <button onclick="importarLR('arquivo')" title="Preset .xmp ou uma foto editada no Lightroom">Importar do Lightroom</button>
         <button onclick="importarLR('pasta')" title="Lê as edições de todas as fotos de um evento já editado e tira o padrão médio">Aprender de um evento</button>
       </div>
+      <select id="presetsLR" style="margin-top:6px; display:none" onchange="importarPresetLR()"></select>
+      <p class="dica">Lightroom (nuvem): para <b>Aprender de um evento</b>, selecione as fotos editadas &gt;
+        Exportar &gt; tipo <b>Original + configurações</b> e escolha essa pasta exportada.</p>
       <p id="lrMsg" class="dica"></p>
       <div id="sliders"></div>
+      <h3>Cor (HSL)</h3>
+      <div class="cores" id="coresHSL"></div>
+      <div id="slidersHSL"></div>
       <h3>Curvas</h3>
       <div id="slidersCurva"></div>
       <div class="canais" style="margin-top:8px">
@@ -144,6 +155,19 @@
       <input type="number" id="qualidade" value="95" min="80" max="100">
       <label class="check"><input type="checkbox" id="versao_web"> Gerar também versão leve (2048 px) para WhatsApp/Instagram</label>
       <label class="check"><input type="checkbox" id="separar_desfocadas" checked> Separar fotos possivelmente desfocadas para revisão</label>
+    </section>
+
+    <section>
+      <h2>5. Nuvem</h2>
+      <p class="dica">Use a pasta do OneDrive, Google Drive ou Dropbox deste computador. O programa
+        da nuvem sincroniza sozinho: os presets aparecem em todos os computadores do estúdio.</p>
+      <div class="linha"><select id="nuvens"></select>
+        <button onclick="escolherNuvem()">Outra</button></div>
+      <div class="linha" style="margin-top:6px; flex-wrap: wrap">
+        <button onclick="presetsNaNuvem()">Guardar presets na nuvem</button>
+        <button onclick="presetsLocais()" id="btnLocal" style="display:none">Voltar para este PC</button>
+      </div>
+      <p id="nuvemMsg" class="dica"></p>
     </section>
 
     <button class="principal" id="btnProcessar" onclick="processar()">Editar todas as fotos</button>
@@ -187,6 +211,8 @@ const CONTROLES = [
   ["matiz", "Matiz", -100, 100, 1],
   ["saturacao", "Saturação", -100, 100, 1],
   ["vibracao", "Vibração", -100, 100, 1],
+  ["claridade", "Claridade", -100, 100, 1, "Contraste de áreas médias (dá 'destaque')"],
+  ["textura", "Textura", -100, 100, 1, "Detalhes finos; negativo suaviza a pele"],
   ["nitidez", "Nitidez", 0, 100, 1],
   ["lut_intensidade", "Força da LUT", 0, 100, 1],
 ];
@@ -196,7 +222,12 @@ const CONTROLES_CURVA = [
   ["curva_escuros", "Escuros", -100, 100, 1],
   ["curva_sombras", "Sombras", -100, 100, 1],
 ];
-const TODOS_CONTROLES = [...CONTROLES, ...CONTROLES_CURVA];
+const CORES_HSL = [["vermelho", "#e0473c"], ["laranja", "#f08a24"], ["amarelo", "#f0d024"], ["verde", "#4cb04a"],
+  ["aqua", "#2fc4c4"], ["azul", "#3a6ee0"], ["roxo", "#8a4ce0"], ["magenta", "#d94cc4"]];
+const CONTROLES_HSL = CORES_HSL.flatMap(([cor]) => [
+  [`hsl_matiz_${cor}`, "Matiz", -100, 100, 1], [`hsl_sat_${cor}`, "Saturação", -100, 100, 1],
+  [`hsl_lum_${cor}`, "Luminância", -100, 100, 1]]);
+const TODOS_CONTROLES = [...CONTROLES, ...CONTROLES_CURVA, ...CONTROLES_HSL];
 let padroes = {};
 let ajustes = {}, presets = [], cameras = [], fotoAtual = null, timer = null, poll = null;
 const $ = id => document.getElementById(id);
@@ -205,6 +236,15 @@ const esc = t => String(t ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "
 function montarSliders() {
   $("sliders").innerHTML = htmlSliders(CONTROLES);
   $("slidersCurva").innerHTML = htmlSliders(CONTROLES_CURVA);
+  $("coresHSL").innerHTML = CORES_HSL.map(([cor, hex], i) =>
+    `<button style="background:${hex}" title="${cor}" data-cor="${cor}" onclick="escolherCor('${cor}')"></button>`).join("");
+  $("slidersHSL").innerHTML = CORES_HSL.map(([cor]) =>
+    `<div data-grupo="${cor}" style="display:none">${htmlSliders(CONTROLES_HSL.filter(c => c[0].endsWith("_" + cor)))}</div>`).join("");
+  escolherCor("laranja");
+}
+function escolherCor(cor) {
+  document.querySelectorAll("#coresHSL button").forEach(b => b.classList.toggle("ativo", b.dataset.cor === cor));
+  document.querySelectorAll("#slidersHSL [data-grupo]").forEach(d => d.style.display = d.dataset.grupo === cor ? "" : "none");
 }
 function htmlSliders(lista) {
   return lista.map(([k, nome, min, max, passo, dica]) => `
@@ -232,12 +272,14 @@ async function api(url, corpo) {
   return dados;
 }
 
-async function carregarPresets(selecionar) {
+async function carregarPresets(selecionar, aplicar = true) {
+  const anterior = presets[$("preset").value]?.arquivo;
   presets = await api("/api/presets");
   $("preset").innerHTML = presets.map((p, i) => `<option value="${i}">${esc(p.nome)}</option>`).join("");
-  const i = selecionar ? presets.findIndex(p => p.arquivo === selecionar) : 0;
+  const alvo = selecionar || (!aplicar && anterior);
+  const i = alvo ? presets.findIndex(p => p.arquivo === alvo) : 0;
   $("preset").value = Math.max(0, i);
-  usarPreset();
+  if (aplicar) usarPreset();  // só troca os ajustes quando pedido (não perde o que não foi salvo)
 }
 function usarPreset() {
   const p = presets[$("preset").value] || {};
@@ -256,10 +298,30 @@ async function salvarPreset() {
 async function importarLR(tipo) {
   const r = await api("/api/escolher", {tipo: tipo === "pasta" ? "pasta" : "lightroom"});
   if (r.erro) alert(r.erro);
-  if (!r.caminho) return;
+  if (r.caminho) await importarCaminhoLR(r.caminho, tipo);
+}
+async function importarPresetLR() {
+  const caminho = $("presetsLR").value;
+  if (caminho) await importarCaminhoLR(caminho, "arquivo");
+  $("presetsLR").value = "";
+}
+async function carregarPresetsLR() {
+  try {
+    const lista = await api("/api/lightroom/presets");
+    if (!lista.length) return;
+    let grupo = null, html = `<option value="">Presets do Lightroom neste computador (${lista.length})…</option>`;
+    for (const p of lista) {
+      if (p.grupo !== grupo) { if (grupo !== null) html += "</optgroup>"; grupo = p.grupo; html += `<optgroup label="${esc(grupo)}">`; }
+      html += `<option value="${esc(p.caminho)}">${esc(p.nome)}</option>`;
+    }
+    $("presetsLR").innerHTML = html + "</optgroup>";
+    $("presetsLR").style.display = "";
+  } catch (e) { /* sem presets do Lightroom: tudo bem */ }
+}
+async function importarCaminhoLR(caminho, tipo) {
   $("lrMsg").textContent = "Lendo as edições do Lightroom…";
   try {
-    const res = await api("/api/lightroom", {caminho: r.caminho});
+    const res = await api("/api/lightroom", {caminho});
     const cams = ajustes.cameras || {};
     ajustes = {...structuredClone(padroes), ...res.ajustes, cameras: cams,
                nome: tipo === "pasta" ? "Padrão aprendido do Lightroom" : "Importado do Lightroom"};
@@ -532,7 +594,49 @@ async function cancelar() { await api("/api/cancelar", {}); }
 function fecharProgresso() { $("progresso").style.display = "none"; }
 async function abrirSaida() { await api("/api/abrir-pasta", {pasta: $("saida").value.trim()}); }
 
+// ---------------------------------------------------------------- nuvem
+async function carregarNuvem() {
+  const r = await api("/api/nuvem");
+  const opcoes = r.pastas.map(p => `<option value="${esc(p.caminho)}">${esc(p.nome)} — ${esc(p.caminho)}</option>`);
+  if (r.pasta_nuvem && !r.pastas.some(p => p.caminho === r.pasta_nuvem))
+    opcoes.unshift(`<option value="${esc(r.pasta_nuvem)}">${esc(r.pasta_nuvem)}</option>`);
+  $("nuvens").innerHTML = opcoes.length ? opcoes.join("") : `<option value="">Nenhuma pasta de nuvem encontrada — use "Outra"</option>`;
+  if (r.pasta_nuvem) $("nuvens").value = r.pasta_nuvem;
+  $("btnLocal").style.display = r.presets_na_nuvem ? "" : "none";
+  $("nuvemMsg").innerHTML = r.presets_na_nuvem
+    ? `<span class="nuvem-ok">✓ Presets sincronizados em</span> ${esc(r.pasta_presets)}`
+    : `Presets guardados só neste computador.`;
+}
+async function escolherNuvem() {
+  const r = await api("/api/escolher", {tipo: "pasta"});
+  if (!r.caminho) return;
+  const op = document.createElement("option");
+  op.value = r.caminho; op.textContent = r.caminho;
+  $("nuvens").prepend(op); $("nuvens").value = r.caminho;
+}
+async function presetsNaNuvem() {
+  const caminho = $("nuvens").value;
+  if (!caminho) { alert("Escolha a pasta da nuvem (OneDrive, Google Drive…)"); return; }
+  try { await api("/api/nuvem", {caminho}); } catch (e) { alert(e.message); return; }
+  await carregarNuvem(); await carregarPresets(null, false);
+}
+async function presetsLocais() {
+  await api("/api/nuvem", {caminho: ""});
+  await carregarNuvem(); await carregarPresets(null, false);
+}
+async function saidaNaNuvem() {
+  const nuvem = $("nuvens").value;
+  if (!nuvem) { alert("Escolha a pasta da nuvem na seção 5"); return; }
+  const entrada = $("entrada").value.trim().replace(/[\\/]+$/, "");
+  const evento = entrada ? entrada.split(/[\\/]/).pop() : $("prefixo").value;
+  const r = await api("/api/nuvem/entrega", {nuvem, evento});
+  $("saida").value = r.caminho;
+  $("msg").textContent = "Atenção: 2.000 fotos ocupam uns 10–16 GB. Confira se o plano da nuvem tem espaço (o Google Drive grátis tem 15 GB).";
+}
+
 montarSliders();
+carregarNuvem();
+carregarPresetsLR();
 ligarCurva();
 api("/api/padroes").then(r => { padroes = r.ajustes; carregarPresets(); });
 </script>

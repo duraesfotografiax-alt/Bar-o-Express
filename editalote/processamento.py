@@ -37,6 +37,8 @@ AJUSTES_PADRAO: dict = {
     "saturacao": 0,              # -100..100
     "vibracao": 0,               # -100..100 (protege cores já saturadas)
     "nitidez": 0,                # 0..100
+    "claridade": 0,              # -100..100 (contraste local, como a Claridade do Lightroom)
+    "textura": 0,                # -100..100 (detalhes finos; negativo suaviza a pele)
     # Curva por regiões (igual à curva paramétrica do Lightroom), -100..100
     "curva_sombras": 0,
     "curva_escuros": 0,
@@ -51,6 +53,14 @@ AJUSTES_PADRAO: dict = {
     "lut_intensidade": 100,      # 0..100
     "cameras": {},               # ajustes finos por câmera (ver ajustes_para_camera)
 }
+
+# HSL / Cor: mesmas 8 faixas do Lightroom (centro do matiz em graus)
+CORES_HSL = (("vermelho", 0), ("laranja", 30), ("amarelo", 60), ("verde", 120),
+             ("aqua", 180), ("azul", 240), ("roxo", 270), ("magenta", 300))
+PROPRIEDADES_HSL = ("matiz", "sat", "lum")
+for _cor, _ in CORES_HSL:
+    for _prop in PROPRIEDADES_HSL:
+        AJUSTES_PADRAO[f"hsl_{_prop}_{_cor}"] = 0  # -100..100
 
 CAMPOS_POR_CAMERA = ("exposicao", "temperatura", "matiz", "saturacao")
 
@@ -139,6 +149,63 @@ def _curva_regioes(a: dict) -> list | None:
     xs = (0.125, 0.375, 0.625, 0.875)
     pontos = [[0, 0]] + [[x * 255, (x + 0.12 * v) * 255] for x, v in zip(xs, valores)] + [[255, 255]]
     return pontos
+
+
+# ------------------------------------------------------------------ HSL / Cor
+
+def rgb_para_hsv(v: np.ndarray):
+    maximo = v.max(axis=-1)
+    minimo = v.min(axis=-1)
+    croma = maximo - minimo
+    r, g, b = v[..., 0], v[..., 1], v[..., 2]
+    seguro = np.where(croma > 1e-9, croma, 1.0)
+    h = np.where(maximo == r, ((g - b) / seguro) % 6,
+                 np.where(maximo == g, (b - r) / seguro + 2, (r - g) / seguro + 4)) * 60.0
+    h = np.where(croma > 1e-9, h, 0.0)
+    s = np.where(maximo > 1e-9, croma / np.where(maximo > 1e-9, maximo, 1.0), 0.0)
+    return h, s, maximo
+
+
+def hsv_para_rgb(h: np.ndarray, s: np.ndarray, v: np.ndarray) -> np.ndarray:
+    h = (h % 360.0) / 60.0
+    c = v * s
+    x = c * (1 - np.abs(h % 2 - 1))
+    m = v - c
+    setor = np.floor(h).astype(np.int64) % 6
+    zero = np.zeros_like(c)
+    r = np.choose(setor, [c, x, zero, zero, x, c])
+    g = np.choose(setor, [x, c, c, x, zero, zero])
+    b = np.choose(setor, [zero, zero, x, c, c, x])
+    return np.stack([r + m, g + m, b + m], axis=-1)
+
+
+def pesos_cor(h: np.ndarray) -> np.ndarray:
+    """Quanto cada pixel pertence a cada uma das 8 faixas (soma 1, transição suave)."""
+    centros = [c for _, c in CORES_HSL] + [360.0]
+    pesos = np.zeros(h.shape + (len(CORES_HSL),))
+    for k in range(len(CORES_HSL)):
+        c0, c1 = centros[k], centros[k + 1]
+        dentro = (h >= c0) & (h < c1)
+        t = np.clip((h - c0) / (c1 - c0), 0.0, 1.0)
+        t = t * t * (3 - 2 * t)
+        pesos[..., k] += np.where(dentro, 1 - t, 0.0)
+        pesos[..., (k + 1) % len(CORES_HSL)] += np.where(dentro, t, 0.0)
+    return pesos
+
+
+def _aplicar_hsl(v: np.ndarray, a: dict) -> np.ndarray:
+    valores = {p: np.array([float(a.get(f"hsl_{p}_{cor}", 0) or 0) / 100.0 for cor, _ in CORES_HSL])
+               for p in PROPRIEDADES_HSL}
+    if not any(np.any(x) for x in valores.values()):
+        return v
+    h, s, brilho = rgb_para_hsv(v)
+    pesos = pesos_cor(h)
+    h2 = h + (pesos @ valores["matiz"]) * 30.0             # ±100 = ±30°
+    s2 = np.clip(s * (1 + pesos @ valores["sat"]), 0.0, 1.0)
+    rgb = hsv_para_rgb(h2, s2, brilho)
+    # luminância: só em cores saturadas (cinza/branco do vestido não mudam)
+    fator = 2.0 ** ((pesos @ valores["lum"]) * 0.8 * s)
+    return np.clip(rgb * fator[..., None], 0.0, 1.0)
 
 
 # ---------------------------------------------------------- análise automática
@@ -300,6 +367,9 @@ def transformar(rgb: np.ndarray, ajustes: dict, analise: Analise | None,
         fator = 1 + saturacao + vibracao * (1 - np.clip(sat_atual * 1.6, 0, 1))
         v = np.clip(y + (v - y) * fator, 0.0, 1.0)
 
+    # 4b) HSL / Cor (pele, grama, céu…)
+    v = _aplicar_hsl(v, a)
+
     # 5) LUT criativa (.cube)
     if lut is not None:
         intensidade = float(a.get("lut_intensidade", 100)) / 100.0
@@ -324,6 +394,12 @@ def aplicar(img: Image.Image, ajustes: dict, analise: Analise | None,
     if img.mode != "RGB":
         img = img.convert("RGB")
     saida = img.filter(montar_lut(ajustes, analise, lut))
+    claridade = float(ajustes.get("claridade", 0) or 0) / 100.0
+    if claridade:
+        saida = contraste_local(saida, 0.7 * claridade, lado=600, raio_rel=0.01, so_meios_tons=True)
+    textura = float(ajustes.get("textura", 0) or 0) / 100.0
+    if textura:
+        saida = contraste_local(saida, 0.6 * textura, lado=2400, raio_rel=0.002, so_meios_tons=False)
     nitidez = float(ajustes.get("nitidez", 0))
     if nitidez > 0:
         # nitidez 3x3 (metade do custo de uma máscara de nitidez gaussiana)
@@ -331,6 +407,33 @@ def aplicar(img: Image.Image, ajustes: dict, analise: Analise | None,
         saida = saida.filter(ImageFilter.Kernel((3, 3), [0, -k, 0, -k, 1 + 4 * k, -k, 0, -k, 0],
                                                 scale=1))
     return saida
+
+
+_MASCARA_MEIOS = [int(round(255 * np.sin(np.pi * x / 255.0))) for x in range(256)]
+
+
+def contraste_local(img: Image.Image, forca: float, lado: int, raio_rel: float,
+                    so_meios_tons: bool) -> Image.Image:
+    """Claridade/Textura: realça (ou suaviza) a diferença entre o pixel e a vizinhança.
+
+    O desfoque é feito numa cópia reduzida e ampliada de volta: fica rápido em 24 MP e o
+    tamanho do efeito é o mesmo na prévia e na foto final (raio relativo ao lado maior).
+    """
+    largura, altura = img.size
+    maior = max(largura, altura)
+    escala = min(1.0, lado / maior)
+    pequeno = img if escala >= 1.0 else img.resize(
+        (max(1, round(largura * escala)), max(1, round(altura * escala))), Image.Resampling.BOX)
+    raio = max(0.5, raio_rel * max(pequeno.size))
+    borrada = pequeno.filter(ImageFilter.GaussianBlur(raio))
+    if borrada.size != img.size:
+        borrada = borrada.resize(img.size, Image.Resampling.BILINEAR)
+    # blend com alfa negativo = img + forca * (img - borrada), calculado em C pelo Pillow
+    resultado = Image.blend(img, borrada, -forca)
+    if so_meios_tons:
+        mascara = img.convert("L").point(_MASCARA_MEIOS)
+        resultado = Image.composite(resultado, img, mascara)
+    return resultado
 
 
 def carregar_lut(ajustes: dict) -> LutCube | None:

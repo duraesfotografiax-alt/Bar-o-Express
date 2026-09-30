@@ -25,7 +25,9 @@ PRESET = """<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core 7.0">
     crs:Saturation="-5"
     crs:Clarity2012="+10"
     crs:ParametricLights="+20"
-    crs:SaturationAdjustmentOrange="-10">
+    crs:SaturationAdjustmentOrange="-10"
+    crs:LuminanceAdjustmentBlue="-30"
+    crs:Dehaze="+15">
    <crs:Name><rdf:Alt><rdf:li xml:lang="x-default">Casamento</rdf:li></rdf:Alt></crs:Name>
    <crs:ToneCurvePV2012>
     <rdf:Seq>
@@ -54,8 +56,10 @@ def test_ler_preset_xmp(tmp_path):
     assert ajustes["curva_claros"] == 20
     assert ajustes["curva"] == [[0, 12], [64, 58], [192, 204], [255, 250]]
     assert "curva_r" not in ajustes  # curva reta não é importada
-    assert "Claridade" in ignorados
-    assert "HSL / Cor (saturação)" in ignorados
+    assert ajustes["claridade"] == 10
+    assert ajustes["hsl_sat_laranja"] == -10
+    assert ajustes["hsl_lum_azul"] == -30
+    assert ignorados == ["Remover névoa"]
 
 
 def _jpeg_com_xmp(caminho, exposicao, sombras):
@@ -105,3 +109,45 @@ def test_curvas_na_transformacao():
     so_vermelho = transformar(grade, {**NEUTRO, "curva_r": [[0, 0], [128, 160], [255, 255]]}, None)
     assert so_vermelho[32, 0] > so_vermelho[32, 1]
     assert np.allclose(so_vermelho[:, 1], eixo, atol=1e-6)
+
+
+def test_hsl_pele_e_ceu():
+    from editalote.processamento import rgb_para_hsv, hsv_para_rgb, pesos_cor
+
+    cores = np.random.default_rng(3).random((500, 3))
+    h, s, v = rgb_para_hsv(cores)
+    assert np.allclose(hsv_para_rgb(h, s, v), cores, atol=1e-9)
+    assert np.allclose(pesos_cor(h).sum(axis=-1), 1.0)
+
+    pele = np.array([[0.85, 0.62, 0.48]])      # laranja
+    ceu = np.array([[0.35, 0.55, 0.90]])       # azul
+    vestido = np.array([[0.93, 0.93, 0.92]])   # quase branco
+    ajustes = {**NEUTRO, "hsl_sat_laranja": -50, "hsl_lum_azul": -60}
+    pele2 = transformar(pele, ajustes, None)
+    assert np.ptp(pele2) < np.ptp(pele)          # pele menos saturada
+    assert transformar(ceu, ajustes, None).sum() < ceu.sum() - 0.1  # céu mais escuro
+    assert np.allclose(transformar(ceu, {**NEUTRO, "hsl_sat_laranja": -50}, None), ceu, atol=0.02)
+    assert np.allclose(transformar(vestido, ajustes, None), vestido, atol=0.01)
+
+
+def test_claridade_e_textura():
+    from PIL import ImageFilter
+
+    from editalote.processamento import aplicar, completar_ajustes
+
+    desvio = lambda im: np.asarray(im.convert("L"), dtype=float).std()
+    ajustes = lambda **extra: completar_ajustes({**NEUTRO, **extra})
+
+    # claridade: contraste de áreas médias
+    suave = Image.effect_noise((800, 600), 40).convert("RGB").filter(ImageFilter.GaussianBlur(3))
+    neutro = aplicar(suave, ajustes(), None)
+    assert desvio(aplicar(suave, ajustes(claridade=80), None)) > desvio(neutro) * 1.2
+    assert desvio(aplicar(suave, ajustes(claridade=-80), None)) < desvio(neutro) * 0.8
+
+    # textura: detalhes finos (negativo suaviza, como pele)
+    fino = Image.effect_noise((800, 600), 40).convert("RGB")
+    neutro = aplicar(fino, ajustes(), None)
+    mais = aplicar(fino, ajustes(textura=60), None)
+    assert mais.size == fino.size
+    assert desvio(mais) > desvio(neutro) * 1.05
+    assert desvio(aplicar(fino, ajustes(textura=-80), None)) < desvio(neutro) * 0.95

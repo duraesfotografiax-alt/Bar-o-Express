@@ -31,11 +31,20 @@ MAPA = {
     "Vibrance": ("vibracao", 1.0),
     "Saturation": ("saturacao", 1.0),
     "Sharpness": ("nitidez", 1 / 1.5),
+    "Clarity2012": ("claridade", 1.0),
+    "Texture": ("textura", 1.0),
     "ParametricShadows": ("curva_sombras", 1.0),
     "ParametricDarks": ("curva_escuros", 1.0),
     "ParametricLights": ("curva_claros", 1.0),
     "ParametricHighlights": ("curva_realces", 1.0),
 }
+
+CORES_LR = {"Red": "vermelho", "Orange": "laranja", "Yellow": "amarelo", "Green": "verde",
+            "Aqua": "aqua", "Blue": "azul", "Purple": "roxo", "Magenta": "magenta"}
+for _lr, _nosso in CORES_LR.items():
+    MAPA[f"HueAdjustment{_lr}"] = (f"hsl_matiz_{_nosso}", 1.0)
+    MAPA[f"SaturationAdjustment{_lr}"] = (f"hsl_sat_{_nosso}", 1.0)
+    MAPA[f"LuminanceAdjustment{_lr}"] = (f"hsl_lum_{_nosso}", 1.0)
 
 CURVAS = {
     "ToneCurvePV2012": "curva",
@@ -46,17 +55,12 @@ CURVAS = {
 
 # Ferramentas ainda não suportadas: aviso quando estiverem em uso
 NAO_SUPORTADOS = {
-    "Clarity2012": "Claridade",
-    "Texture": "Textura",
     "Dehaze": "Remover névoa",
     "PostCropVignetteAmount": "Vinheta",
     "GrainAmount": "Granulação",
     "LuminanceSmoothing": "Redução de ruído",
 }
 PREFIXOS_NAO_SUPORTADOS = {
-    "HueAdjustment": "HSL / Cor (matiz)",
-    "SaturationAdjustment": "HSL / Cor (saturação)",
-    "LuminanceAdjustment": "HSL / Cor (luminância)",
     "ColorGrade": "Gradação de cor",
     "SplitToning": "Tonalização dividida",
 }
@@ -188,8 +192,9 @@ def aprender(caminho: str, limite: int = 400) -> dict:
             break
     if not edicoes:
         raise ValueError(
-            "Não encontrei edições do Lightroom. No Lightroom Classic selecione as fotos e use "
-            "Metadados > Salvar metadados no arquivo (Ctrl+S), ou exporte um preset (.xmp)."
+            "Não encontrei edições do Lightroom nessa pasta. No Lightroom (nuvem): selecione as "
+            "fotos editadas > Exportar > tipo \"Original + configurações\" e escolha a pasta "
+            "exportada aqui. No Lightroom Classic: Metadados > Salvar metadados no arquivo (Ctrl+S)."
         )
 
     final: dict = {}
@@ -206,3 +211,36 @@ def aprender(caminho: str, limite: int = 400) -> dict:
             todos = [e.get(chave, 0) for e in edicoes]
             final[chave] = round(statistics.median(todos), 2)
     return {"ajustes": final, "fotos": len(edicoes), "ignorados": sorted(ignorados)}
+
+
+def pastas_presets_lightroom() -> list[str]:
+    """Onde o Lightroom (nuvem e Classic) guarda os presets neste computador."""
+    pastas = []
+    if os.environ.get("APPDATA"):  # Windows
+        pastas.append(os.path.join(os.environ["APPDATA"], "Adobe", "CameraRaw", "Settings"))
+    pastas.append(os.path.expanduser("~/Library/Application Support/Adobe/CameraRaw/Settings"))
+    return [p for p in pastas if os.path.isdir(p)]
+
+
+def presets_instalados(pastas: list[str] | None = None) -> list[dict]:
+    """Lista os presets .xmp do Lightroom que têm ajustes que o EditaLote entende."""
+    encontrados = []
+    for pasta in pastas if pastas is not None else pastas_presets_lightroom():
+        for raiz, _, nomes in os.walk(pasta):
+            for nome in sorted(nomes):
+                if not nome.lower().endswith(".xmp"):
+                    continue
+                caminho = os.path.join(raiz, nome)
+                try:
+                    crs = ler_crs(caminho)
+                except OSError:
+                    continue
+                if not crs or not converter(crs)[0]:
+                    continue
+                titulo = crs.get("Name")
+                titulo = titulo[0] if isinstance(titulo, list) and titulo else os.path.splitext(nome)[0]
+                grupo = crs.get("Group")
+                grupo = grupo[0] if isinstance(grupo, list) and grupo else os.path.basename(raiz)
+                encontrados.append({"nome": titulo, "grupo": grupo, "caminho": caminho})
+    encontrados.sort(key=lambda p: (p["grupo"].lower(), p["nome"].lower()))
+    return encontrados

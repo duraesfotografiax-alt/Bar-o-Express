@@ -14,7 +14,8 @@ import webbrowser
 from flask import Flask, abort, jsonify, request, send_file, send_from_directory
 from PIL import Image
 
-from .lightroom import aprender
+from . import nuvem
+from .lightroom import aprender, presets_instalados
 from .lote import OPCOES_PADRAO, Trabalho, resumo_pasta
 from .metadados import EXTENSOES
 from .processamento import AJUSTES_PADRAO, previa_jpeg
@@ -26,7 +27,6 @@ if getattr(sys, "frozen", False):
 else:
     RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     PASTA_ESTATICA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "estatico")
-PASTA_PRESETS = os.path.join(RAIZ, "presets")
 
 app = Flask(__name__, static_folder=None)
 _trabalho: Trabalho | None = None
@@ -78,6 +78,41 @@ def importar_lightroom():
         return jsonify({"erro": str(erro)}), 400
 
 
+@app.get("/api/lightroom/presets")
+def presets_lightroom():
+    return jsonify(presets_instalados())
+
+
+@app.get("/api/nuvem")
+def estado_nuvem():
+    config = nuvem.ler_config(RAIZ)
+    pasta = nuvem.pasta_presets(RAIZ)
+    return jsonify({
+        "pastas": nuvem.detectar_nuvens(),
+        "pasta_nuvem": config.get("pasta_nuvem") or "",
+        "pasta_presets": pasta,
+        "presets_na_nuvem": pasta != os.path.join(RAIZ, "presets"),
+    })
+
+
+@app.post("/api/nuvem")
+def configurar_nuvem():
+    caminho = (request.json or {}).get("caminho", "")
+    try:
+        pasta = nuvem.usar_nuvem_para_presets(RAIZ, caminho or None)
+    except (ValueError, OSError) as erro:
+        return jsonify({"erro": str(erro)}), 400
+    return jsonify({"pasta_presets": pasta})
+
+
+@app.post("/api/nuvem/entrega")
+def pasta_entrega():
+    dados = request.json or {}
+    if not os.path.isdir(dados.get("nuvem", "")):
+        return jsonify({"erro": "Escolha primeiro a pasta da nuvem"}), 400
+    return jsonify({"caminho": nuvem.pasta_entrega(dados["nuvem"], dados.get("evento") or "Evento")})
+
+
 @app.post("/api/escanear")
 def escanear():
     dados = request.json or {}
@@ -115,10 +150,11 @@ def previa():
 @app.get("/api/presets")
 def listar_presets():
     presets = []
-    os.makedirs(PASTA_PRESETS, exist_ok=True)
-    for nome in sorted(os.listdir(PASTA_PRESETS)):
+    pasta = nuvem.pasta_presets(RAIZ)
+    os.makedirs(pasta, exist_ok=True)
+    for nome in sorted(os.listdir(pasta)):
         if nome.endswith(".json"):
-            with open(os.path.join(PASTA_PRESETS, nome), encoding="utf-8") as f:
+            with open(os.path.join(pasta, nome), encoding="utf-8") as f:
                 presets.append({"arquivo": nome, **json.load(f)})
     return jsonify(presets)
 
@@ -130,7 +166,9 @@ def salvar_preset():
     if not nome:
         return jsonify({"erro": "Dê um nome ao preset"}), 400
     arquivo = re.sub(r"[^a-z0-9]+", "-", nome.lower()).strip("-") or "preset"
-    caminho = os.path.join(PASTA_PRESETS, f"{arquivo}.json")
+    pasta = nuvem.pasta_presets(RAIZ)
+    os.makedirs(pasta, exist_ok=True)
+    caminho = os.path.join(pasta, f"{arquivo}.json")
     with open(caminho, "w", encoding="utf-8") as f:
         json.dump(ajustes, f, ensure_ascii=False, indent=2)
     return jsonify({"arquivo": f"{arquivo}.json"})
