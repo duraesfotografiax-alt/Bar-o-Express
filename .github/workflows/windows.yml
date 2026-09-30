@@ -4,9 +4,14 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      versao:
+        description: "Publicar como versão oficial (ex.: v0.3.0). Vazio = só testar."
+        required: false
+        default: ""
 
 permissions:
-  contents: write  # para publicar a versão (Release) quando uma tag v* é enviada
+  contents: write  # para publicar a versão (Release)
 
 jobs:
   windows:
@@ -64,16 +69,19 @@ jobs:
           name: EditaLote-Windows
           path: dist/EditaLote
 
-      # Tag v1.2.3 -> versão oficial com link fixo:
+      # Tag v1.2.3 (ou execução manual com "versao") -> versão oficial com link fixo:
       # https://github.com/<dono>/<repo>/releases/latest/download/EditaLote-Windows.zip
       - name: Compactar para a versão oficial
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.versao != ''
         shell: pwsh
         run: Compress-Archive -Path dist/EditaLote -DestinationPath EditaLote-Windows.zip
 
       - name: Publicar versão oficial
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.versao != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.versao || github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          name: EditaLote ${{ inputs.versao || github.ref_name }}
           files: EditaLote-Windows.zip
           generate_release_notes: true

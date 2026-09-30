@@ -153,6 +153,7 @@ Estrutura:
 
 ## Publicar uma nova versão
 
-Crie e envie uma tag `v` + número (ex.: `git tag v0.3.0 && git push origin v0.3.0`). O GitHub
-testa no Windows, gera o `EditaLote-Windows.zip` e publica em **Releases**. O link
+No GitHub: **Actions** > **Windows (testes e EditaLote.exe)** > **Run workflow**, escolha a branch
+e preencha a versão (ex.: `v0.3.0`). Enviar uma tag `v0.3.0` tem o mesmo efeito. O GitHub testa no
+Windows, gera o `EditaLote-Windows.zip` e publica em **Releases**. O link
 `releases/latest/download/EditaLote-Windows.zip` passa a apontar para essa versão.
