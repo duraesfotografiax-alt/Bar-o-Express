@@ -2,7 +2,7 @@ rules_version = '2';
 
 // Regras de segurança do banco de dados do Projeto Uniforça.
 // Se mudar ADMINS em js/config.js, mude aqui também.
-// Os desafios ficam só em js/config.js; aqui só limitamos o formato e os pontos.
+// Desafios, datas e prêmios ficam em config/rally e são editados pelo administrador no app.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -13,15 +13,30 @@ service cloud.firestore {
       return logado() && request.auth.token.email in ['lucas@uniforca.app'];
     }
 
+    // Conta do robô que envia o lembrete diário (.github/workflows/lembrete.yml).
+    function robo() {
+      return logado() && request.auth.token.email == 'robo@uniforca.app';
+    }
+
+    function removido(uid) {
+      return exists(/databases/$(database)/documents/removidos/$(uid));
+    }
+
     match /usuarios/{uid} {
       allow read: if logado();
-      // Cada um cria só o próprio perfil; ninguém se promove a admin sozinho.
-      allow create: if logado() && request.auth.uid == uid
+      // Cada um cria só o próprio perfil; ninguém se promove a admin sozinho;
+      // conta removida pelo administrador não volta sozinha.
+      allow create: if admin() || (logado() && request.auth.uid == uid
+        && !removido(uid)
         && request.resource.data.keys().hasOnly(['nome', 'usuario', 'role', 'criadoEm'])
         && request.resource.data.nome is string && request.resource.data.nome.size() <= 60
         && request.resource.data.usuario + '@uniforca.app' == request.auth.token.email
-        && (request.resource.data.role == 'membro' || (request.resource.data.role == 'admin' && admin()));
+        && request.resource.data.role == 'membro');
       allow update, delete: if admin();
+    }
+
+    match /removidos/{uid} {
+      allow read, write: if admin();
     }
 
     match /registros/{id} {
@@ -29,6 +44,7 @@ service cloud.firestore {
 
       // O integrante marca um desafio: id = <uid>_<data>_<desafio>, 1 por dia.
       allow create: if logado()
+        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
         && request.resource.data.uid == request.auth.uid
         && id == request.auth.uid + '_' + request.resource.data.data + '_' + request.resource.data.desafioId
         && request.resource.data.desafioId is string
@@ -50,6 +66,26 @@ service cloud.firestore {
         && resource.data.uid == request.auth.uid
         && resource.data.status == 'ok'
         && request.time < resource.data.criadoEm + duration.value(24, 'h'));
+    }
+
+    // Ajustes do Rally: todos leem, só o administrador muda.
+    match /config/rally {
+      allow read: if logado();
+      allow write: if admin();
+    }
+
+    // Controle do robô: em que dia o lembrete já foi enviado.
+    match /config/envio {
+      allow read, write: if robo() || admin();
+    }
+
+    // Celulares que ativaram o lembrete. Cada um grava só a própria inscrição.
+    match /inscricoes/{id} {
+      allow create, update: if logado()
+        && request.resource.data.uid == request.auth.uid
+        && id.matches(request.auth.uid + '_[0-9a-f]{16}');
+      allow read: if robo() || admin();
+      allow delete: if robo() || admin() || (logado() && resource.data.uid == request.auth.uid);
     }
   }
 }

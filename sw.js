@@ -1,6 +1,6 @@
 // Guarda os arquivos do app no aparelho para abrir rápido.
 // Ao mudar qualquer arquivo, aumente a versão abaixo.
-const VERSAO = "uniforca-v5";
+const VERSAO = "uniforca-v6";
 const ARQUIVOS = [
   "./", "index.html", "css/style.css", "js/app.js", "js/store.js", "js/config.js", "js/icons.js",
   "manifest.webmanifest", "assets/logo.png", "assets/icon-192.png", "assets/icon-512.png",
@@ -32,5 +32,31 @@ self.addEventListener("fetch", (e) => {
         return resp;
       })
       .catch(() => caches.match(e.request))
+  );
+});
+
+// Lembrete do desafio do dia, enviado pelo robô (.github/workflows/lembrete.yml).
+self.addEventListener("push", (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = { body: e.data?.text() }; }
+  e.waitUntil(
+    self.registration.showNotification(d.title || "Uniforça 💪", {
+      body: d.body || "Não esqueça o Desafio do dia! Cada atitude conta.",
+      icon: "assets/icon-192.png",
+      badge: "assets/icon-192.png",
+      tag: "desafio-do-dia",
+      renotify: true,
+    })
+  );
+});
+
+// Tocar na notificação abre o app (ou traz para frente se já estiver aberto).
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  e.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((janelas) => {
+      for (const j of janelas) if ("focus" in j) return j.focus();
+      return self.clients.openWindow("./");
+    })
   );
 });

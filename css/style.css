@@ -226,3 +226,36 @@ img { max-width: 100%; display: block; }
 }
 .item .pos svg { width: 18px; height: 18px; }
 .versao { text-align: center; color: var(--cinza); font-size: 0.7rem; opacity: 0.6; margin: 24px 0 0; }
+
+/* Ajustes (administrador) */
+.dica { color: var(--cinza); font-size: 0.85rem; line-height: 1.45; margin: 0 2px 12px; }
+.dica b { color: var(--branco); }
+.bloco { background: var(--preto-2); border: 1px solid var(--linha); border-radius: 20px; padding: 16px; margin-top: 16px; }
+.bloco h3 { margin: 0 0 10px; font-size: 1rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.03em; color: var(--laranja); }
+.bloco .campo:last-of-type { margin-bottom: 0; }
+.bloco .botao { margin-top: 12px; }
+.duas-colunas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.duas-colunas .campo { margin-bottom: 0; min-width: 0; }
+.campo select { width: 100%; padding: 14px 16px; border-radius: 14px; border: 2px solid var(--linha); background: var(--preto); font-size: 1rem; outline: none; }
+.campo select:focus { border-color: var(--laranja); }
+.campo input[type="date"] { min-width: 0; padding: 12px 10px; }
+.lista-edicao { display: flex; flex-direction: column; gap: 10px; }
+.edita-desafio { display: grid; grid-template-columns: 44px 1fr auto; grid-template-areas: "ic titulo titulo" "ic pontos tirar"; gap: 8px; align-items: center; padding: 10px; border-radius: 14px; background: var(--preto); border: 1px solid var(--linha); }
+.ic-botao { grid-area: ic; width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: rgba(255, 162, 0, 0.12); color: var(--laranja); align-self: start; }
+.ic-botao svg { width: 24px; height: 24px; }
+.ed-titulo { grid-area: titulo; min-width: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--linha); background: var(--preto-2); font-weight: 700; outline: none; }
+.ed-pontos { grid-area: pontos; display: flex; align-items: center; gap: 6px; color: var(--cinza); font-size: 0.85rem; font-weight: 700; }
+.ed-pontos input { width: 84px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--linha); background: var(--preto-2); font-weight: 800; color: var(--laranja); outline: none; font-variant-numeric: tabular-nums; }
+.edita-desafio .acao { grid-area: tirar; justify-self: end; }
+.ed-titulo:focus, .ed-pontos input:focus { border-color: var(--laranja); }
+.botoes-fixos { display: grid; gap: 10px; margin-top: 16px; }
+.perigo-contorno { background: transparent; color: #ff6b6b; border: 1.5px solid rgba(229, 57, 53, 0.5); box-shadow: none; }
+
+/* Lembrete do desafio do dia */
+.lembrete { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; margin-top: 14px; padding: 12px 14px; border-radius: 16px; background: var(--preto-2); border: 1px dashed rgba(255, 162, 0, 0.45); color: var(--branco); }
+.lembrete span { font-size: 1.5rem; }
+.lembrete p { margin: 0; font-size: 0.85rem; line-height: 1.4; color: var(--cinza); }
+.lembrete p b { color: var(--branco); }
+.lembrete.ok { border-style: solid; border-color: rgba(46, 204, 113, 0.4); }
+.botao-lembrete { border-style: solid; border-color: var(--laranja); background: rgba(255, 162, 0, 0.1); }
+.botao-lembrete:active { transform: scale(0.98); }

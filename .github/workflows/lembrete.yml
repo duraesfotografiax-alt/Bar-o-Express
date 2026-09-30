@@ -1,0 +1,35 @@
+name: Lembrete do Desafio do dia
+
+# Roda de hora em hora; o script só envia uma vez por dia, a partir do horário
+# escolhido pelo administrador no app (aba Ajustes).
+on:
+  schedule:
+    - cron: "7 * * * *"
+  workflow_dispatch:
+    inputs:
+      forcar:
+        description: "Enviar agora, sem esperar o horário"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lembrete
+  cancel-in-progress: false
+
+jobs:
+  lembrete:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-save --no-package-lock web-push@3
+      - run: node scripts/lembrete.mjs
+        env:
+          UNIFORCA_PUSH: ${{ secrets.UNIFORCA_PUSH }}
+          FORCAR: ${{ inputs.forcar }}

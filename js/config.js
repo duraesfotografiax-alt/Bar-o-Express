@@ -1,6 +1,7 @@
 // =====================================================================
 //  CONFIGURAÇÃO DO APP — Projeto Uniforça
-//  Edite este arquivo para mudar desafios, prêmios, datas e administradores.
+//  Desafios, datas, prêmios e horário do lembrete são só os valores iniciais:
+//  o administrador muda tudo isso pelo app, na aba Ajustes.
 // =====================================================================
 
 // 1) FIREBASE (banco de dados online, plano gratuito)
@@ -41,10 +42,18 @@ export const DESAFIOS_ANTIGOS = [
   { id: "codigo-q", titulo: "Código Q", icone: "radio" },
 ];
 
-// 5) PRÊMIOS — texto livre, mude quando decidirem.
+// 5) PRÊMIOS
 export const PREMIOS = {
   individuais: [
     { lugar: 1, premio: "Rodízio" },
   ],
   projeto: "", // deixe vazio para não mostrar
 };
+
+// 6) LEMBRETE DIÁRIO NO CELULAR — hora (horário de Brasília) em que todos recebem o aviso.
+//    null = desligado.
+export const LEMBRETE_HORA = 19;
+
+// Chave pública do lembrete (Web Push). A chave privada fica só no segredo
+// UNIFORCA_PUSH do GitHub, usado pelo robô em .github/workflows/lembrete.yml.
+export const VAPID_PUBLICA = "BHIS3SUBkSOABEgj7GjvAsnJRaSbjNMrMx1NpBrAQscvmzyH-WF74u5o7aMpwu5nhIJaENll1Ew0yo2bGSPuGmk";

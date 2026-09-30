@@ -59,9 +59,32 @@ O link fica parecido com `https://uniforca.web.app`. É esse link que você mand
 
 Opção 2, **GitHub Pages**: em *Settings → Pages* do repositório, escolha o branch e a pasta `/ (root)`. No plano gratuito, o repositório precisa ser público.
 
+## Área do administrador
+
+O Lucas (`lucas`) tem as abas **Painel · Desafios · Ranking · Registros · Ajustes**. Em **Ajustes** ele:
+
+- troca, adiciona ou tira desafios e muda os pontos (de 1 a 300);
+- muda as datas de começo e fim do Rally;
+- muda a premiação (1º, 2º e 3º lugar; em branco não aparece);
+- escolhe o horário do lembrete diário (ou desliga);
+- cria contas para outras pessoas e restaura contas removidas.
+
+Para **remover** uma conta: Ranking → tocar na pessoa → **Remover conta**. A pessoa não consegue mais entrar e sai do ranking; os pontos voltam se a conta for restaurada.
+
+## Lembrete diário no celular
+
+Cada pessoa ativa uma vez no app (botão **Ativar lembrete do Desafio do dia** na tela de desafios). No iPhone, o app precisa estar instalado na Tela de Início.
+
+Quem envia é um robô gratuito do GitHub Actions ([`.github/workflows/lembrete.yml`](.github/workflows/lembrete.yml) e [`scripts/lembrete.mjs`](scripts/lembrete.mjs)). Ele roda de hora em hora e manda **uma vez por dia**, a partir do horário escolhido em Ajustes (horário de Brasília). Precisa:
+
+1. Do segredo **`UNIFORCA_PUSH`** em *Settings → Secrets and variables → Actions* do repositório.
+2. Do arquivo do robô no branch principal (`main`): o GitHub só roda agendamentos no branch principal.
+
+Para testar na hora: aba *Actions* → **Lembrete do Desafio do dia** → *Run workflow* → marcar "Enviar agora".
+
 ## Personalizar
 
-Tudo fica em [`js/config.js`](js/config.js):
+Os valores iniciais ficam em [`js/config.js`](js/config.js) (o que o administrador salvar em Ajustes vale por cima):
 
 - `ADMINS`: quem é administrador. **Se mudar, mude também em `firestore.rules`** (`'lucas@uniforca.app'`).
 - `RALLY`: data de início e de fim. Só contam os pontos feitos dentro desse período.

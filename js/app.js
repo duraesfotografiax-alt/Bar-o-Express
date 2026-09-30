@@ -1,8 +1,8 @@
-import { DESAFIOS, DESAFIOS_ANTIGOS, PREMIOS, RALLY } from "./config.js";
+import { DESAFIOS, DESAFIOS_ANTIGOS, PREMIOS, RALLY, LEMBRETE_HORA, VAPID_PUBLICA } from "./config.js";
 import { store, hoje, normalizarUsuario } from "./store.js";
 import { ICONES } from "./icons.js";
 
-const VERSAO_APP = "versão 5";
+const VERSAO_APP = "versão 6";
 const $app = document.getElementById("app");
 const $toast = document.getElementById("toast");
 
@@ -16,7 +16,23 @@ const estado = {
   busca: "",
   totalMostrado: 0,
   modoCadastro: false,
+  config: null, // ajustes salvos pelo administrador (sobrepõem os valores iniciais do config.js)
+  rascunho: null, // admin: ajustes sendo editados
+  removidos: [], // admin: contas removidas
+  lembreteAtivo: false,
 };
+
+// Valores iniciais; o que o administrador salvar na aba Ajustes vale por cima.
+const PADRAO = {
+  desafios: DESAFIOS,
+  antigos: DESAFIOS_ANTIGOS,
+  inicio: RALLY.inicio,
+  fim: RALLY.fim,
+  premios: PREMIOS.individuais.map((p) => p.premio),
+  lembreteHora: LEMBRETE_HORA,
+};
+const cfg = () => ({ ...PADRAO, ...(estado.config || {}) });
+const MAX_PONTOS = 300; // limite também conferido nas regras do Firestore
 
 // ---------------------------------------------------------------------------
 //  Utilidades
@@ -25,9 +41,10 @@ const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const fmt = (n) => n.toLocaleString("pt-BR");
 const desafio = (id) =>
-  DESAFIOS.find((d) => d.id === id) || DESAFIOS_ANTIGOS.find((d) => d.id === id) || { titulo: id, icone: "alvo", pontos: 0 };
+  cfg().desafios.find((d) => d.id === id) || cfg().antigos.find((d) => d.id === id) || { titulo: id, icone: "alvo", pontos: 0 };
 const iniciais = (nome) => nome.trim().split(/\s+/).slice(0, 2).map((p) => p[0]).join("").toUpperCase();
 const primeiroNome = (nome) => nome.trim().split(/\s+/)[0];
+const dataBR = (iso) => dataLocal(iso).toLocaleDateString("pt-BR");
 
 const dataLocal = (iso) => { const [a, m, d] = iso.split("-").map(Number); return new Date(a, m - 1, d); };
 const somarDias = (iso, n) => {
@@ -41,7 +58,7 @@ const nomeDia = (iso) => {
   return dataLocal(iso).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" });
 };
 
-const valido = (r) => r.status === "ok" && r.data >= RALLY.inicio && r.data <= RALLY.fim;
+const valido = (r) => r.status === "ok" && r.data >= cfg().inicio && r.data <= cfg().fim;
 // Todos participam do Rally, inclusive o administrador.
 const membros = () => estado.usuarios;
 
@@ -103,9 +120,11 @@ function comemorar(x, y, pontos) {
 }
 
 async function carregar() {
-  const [usuarios, registros] = await Promise.all([store.usuarios(), store.registros()]);
+  const [usuarios, registros, config] = await Promise.all([store.usuarios(), store.registros(), store.lerConfig().catch(() => null)]);
   estado.usuarios = usuarios;
   estado.registros = registros;
+  estado.config = config;
+  if (estado.usuario?.role === "admin" && estado.aba === "ajustes") estado.removidos = await store.removidos().catch(() => []);
 }
 
 // ---------------------------------------------------------------------------
@@ -170,9 +189,9 @@ const ABAS_MEMBRO = [
 const ABAS_ADMIN = [
   { id: "painel", rotulo: "Painel", icone: "painel" },
   { id: "desafios", rotulo: "Desafios", icone: "alvo" },
-  { id: "integrantes", rotulo: "Integrantes", icone: "pessoas" },
+  { id: "ranking", rotulo: "Ranking", icone: "trofeu" },
   { id: "registros", rotulo: "Registros", icone: "lista" },
-  { id: "premios", rotulo: "Prêmios", icone: "presente" },
+  { id: "ajustes", rotulo: "Ajustes", icone: "engrenagem" },
 ];
 
 function moldura(conteudo) {
@@ -208,8 +227,10 @@ function telaDesafios() {
   const total = meus.filter(valido).reduce((s, r) => s + r.pontos, 0);
   const ptsHoje = [...deHoje.values()].filter(valido).reduce((s, r) => s + r.pontos, 0);
   const pos = ranking().findIndex((m) => m.uid === u.uid) + 1;
-  const pct = Math.round((deHoje.size / DESAFIOS.length) * 100);
-  const foraDoPeriodo = hoje() < RALLY.inicio || hoje() > RALLY.fim;
+  const { desafios, inicio, fim } = cfg();
+  const feitosHoje = desafios.filter((d) => deHoje.has(d.id)).length;
+  const pct = Math.round((feitosHoje / Math.max(1, desafios.length)) * 100);
+  const foraDoPeriodo = hoje() < inicio || hoje() > fim;
 
   return `
     <section class="placar">
@@ -218,14 +239,15 @@ function telaDesafios() {
       <div class="linha-info">
         <span class="chip">Hoje: +${fmt(ptsHoje)}</span>
         ${pos ? `<span class="chip">${pos}º no ranking</span>` : ""}
-        <span class="chip">${deHoje.size}/${DESAFIOS.length} desafios</span>
+        <span class="chip">${feitosHoje}/${desafios.length} desafios</span>
       </div>
       <div class="progresso"><i style="width:${pct}%"></i></div>
     </section>
-    ${foraDoPeriodo ? `<div class="faixa-demo" style="margin-top:14px">O Rally vale de ${dataLocal(RALLY.inicio).toLocaleDateString("pt-BR")} a ${dataLocal(RALLY.fim).toLocaleDateString("pt-BR")}. Pontos fora desse período não contam.</div>` : ""}
+    ${foraDoPeriodo ? `<div class="faixa-demo" style="margin-top:14px">O Rally vale de ${dataBR(inicio)} a ${dataBR(fim)}. Pontos fora desse período não contam.</div>` : ""}
+    ${cartaoLembrete()}
     <div class="titulo-secao"><h2>Desafios <em>de hoje</em></h2><span>toque para marcar</span></div>
     <section class="grade">
-      ${DESAFIOS.map((d, i) => {
+      ${desafios.map((d, i) => {
         const r = deHoje.get(d.id);
         const cls = r ? (r.status === "ok" ? "feito" : "rejeitado") : "";
         return `<button class="desafio ${cls}" data-desafio="${d.id}">
@@ -242,7 +264,9 @@ function telaDesafios() {
 }
 
 function telaRanking() {
-  const lista = ranking();
+  const admin = estado.usuario.role === "admin";
+  if (admin && estado.detalheUid) return telaDetalhe();
+  const lista = ranking().map((m, i) => ({ ...m, pos: i + 1 }));
   if (!lista.length) return `<div class="vazio">Ainda não há integrantes cadastrados.</div>`;
   const [p1, p2, p3] = lista;
   const degrau = (m, n) => m ? `
@@ -253,16 +277,25 @@ function telaRanking() {
       <div class="pt">${fmt(m.total)} pts</div>
       <div class="base">${n}º</div>
     </div>` : `<div></div>`;
+  const q = normalizarUsuario(estado.busca);
+  const filtrada = admin && q ? lista.filter((m) => normalizarUsuario(m.nome).includes(q) || m.usuario.includes(q)) : lista;
+  const linha = (m) => {
+    const miolo = `
+          <span class="pos">${m.pos}</span>
+          <span class="info"><strong>${esc(m.nome)}</strong><small>@${esc(m.usuario)}</small></span>
+          <span class="valor">${fmt(m.total)} pts</span>`;
+    const eu = m.uid === estado.usuario.uid ? "eu" : "";
+    return admin
+      ? `<button class="item ${eu}" data-integrante="${esc(m.uid)}">${miolo}</button>`
+      : `<div class="item ${eu}">${miolo}</div>`;
+  };
   return `
     <div class="titulo-secao"><h2>Ranking <em>do Rally</em></h2><span>${lista.length} integrantes</span></div>
     <section class="podio">${degrau(p2, 2)}${degrau(p1, 1)}${degrau(p3, 3)}</section>
+    ${admin ? `<input class="busca" id="busca" type="search" placeholder="Buscar por nome ou usuário" value="${esc(estado.busca)}" />
+    <p class="dica">Toque em alguém para ver os registros ou remover a conta.</p>` : ""}
     <section class="lista">
-      ${lista.map((m, i) => `
-        <div class="item ${m.uid === estado.usuario.uid ? "eu" : ""}">
-          <span class="pos">${i + 1}</span>
-          <span class="info"><strong>${esc(m.nome)}</strong><small>@${esc(m.usuario)}</small></span>
-          <span class="valor">${fmt(m.total)} pts</span>
-        </div>`).join("")}
+      ${filtrada.map(linha).join("") || `<div class="vazio">Ninguém encontrado.</div>`}
     </section>`;
 }
 
@@ -304,18 +337,17 @@ function telaHistorico() {
 }
 
 function telaPremios() {
+  const premios = cfg().premios.map((premio, i) => ({ lugar: i + 1, premio })).filter((p) => p.premio);
   return `
     <div class="titulo-secao"><h2>Premiação <em>do Rally</em></h2></div>
     <section class="lista">
-      ${PREMIOS.individuais.map((p) => `
+      ${premios.map((p) => `
         <div class="premio l${p.lugar}">
           <span class="lugar">${p.lugar}º</span>
           <span><small>${p.lugar}º lugar</small><strong>${esc(p.premio)}</strong></span>
-        </div>`).join("")}
+        </div>`).join("") || `<div class="vazio">A premiação ainda vai ser divulgada.</div>`}
     </section>
-    ${PREMIOS.projeto ? `
-    <div class="titulo-secao"><h2>Premiação <em>do projeto</em></h2></div>
-    <div class="premio-projeto"><h3>1º lugar</h3>${esc(PREMIOS.projeto)}</div>` : ""}
+    <p class="dica" style="text-align:center">O Rally vale de ${dataBR(cfg().inicio)} a ${dataBR(cfg().fim)}.</p>
     <div class="frase-final"><span class="pincel">Mais pontos, mais propósito!</span></div>`;
 }
 
@@ -336,7 +368,7 @@ function telaPainel() {
       <div class="stat"><b>${ativosHoje.size}</b><span>Ativos hoje</span></div>
       <div class="stat"><b>${fmt(pontosHoje)}</b><span>Pontos hoje</span></div>
     </section>
-    <div class="titulo-secao"><h2>Top <em>5</em></h2><button class="acao" data-aba="integrantes">Ver todos</button></div>
+    <div class="titulo-secao"><h2>Top <em>5</em></h2><button class="acao" data-aba="ranking">Ver todos</button></div>
     <section class="lista">
       ${lista.slice(0, 5).map((m, i) => `
         <button class="item" data-integrante="${esc(m.uid)}">
@@ -356,31 +388,14 @@ function telaPainel() {
     </section>`;
 }
 
-function telaIntegrantes() {
-  if (estado.detalheUid) return telaDetalhe();
-  const q = normalizarUsuario(estado.busca);
-  const lista = ranking().map((m, i) => ({ ...m, pos: i + 1 }))
-    .filter((m) => !q || normalizarUsuario(m.nome).includes(q) || m.usuario.includes(q));
-  return `
-    <div class="titulo-secao"><h2>Integrantes</h2><span>${lista.length}</span></div>
-    <input class="busca" id="busca" type="search" placeholder="Buscar por nome ou usuário" value="${esc(estado.busca)}" />
-    <section class="lista">
-      ${lista.map((m) => `
-        <button class="item" data-integrante="${esc(m.uid)}">
-          <span class="pos">${m.pos}</span>
-          <span class="info"><strong>${esc(m.nome)}</strong><small>@${esc(m.usuario)}</small></span>
-          <span class="valor">${fmt(m.total)} pts</span>
-        </button>`).join("") || `<div class="vazio">Ninguém encontrado.</div>`}
-    </section>`;
-}
-
 function telaDetalhe() {
   const m = ranking().find((x) => x.uid === estado.detalheUid);
-  if (!m) { estado.detalheUid = null; return telaIntegrantes(); }
+  if (!m) { estado.detalheUid = null; return telaRanking(); }
   const regs = estado.registros.filter((r) => r.uid === m.uid);
   const dias = new Set(regs.filter(valido).map((r) => r.data)).size;
+  const souEu = m.uid === estado.usuario.uid;
   return `
-    <button class="voltar" data-acao="voltar">${ICONES.voltar} Integrantes</button>
+    <button class="voltar" data-acao="voltar">${ICONES.voltar} Ranking</button>
     <section class="placar" style="margin-top:8px">
       <div class="rotulo">${esc(m.nome)} · @${esc(m.usuario)}</div>
       <div class="total">${fmt(m.total)}<small>pts</small></div>
@@ -390,7 +405,8 @@ function telaDetalhe() {
       </div>
     </section>
     <div class="titulo-secao"><h2>Registros</h2><span>rejeite o que não foi feito</span></div>
-    ${listaRegistros(regs, { admin: true })}`;
+    ${listaRegistros(regs, { admin: true })}
+    ${souEu ? "" : `<button class="botao perigo-contorno" style="margin-top:22px" data-acao="remover-conta" data-uid="${esc(m.uid)}">Remover conta</button>`}`;
 }
 
 function telaRegistros() {
@@ -413,11 +429,192 @@ function telaRegistros() {
 }
 
 // ---------------------------------------------------------------------------
+//  Ajustes (administrador): desafios, datas, prêmios, lembrete e contas
+// ---------------------------------------------------------------------------
+const ICONES_DESAFIO = ["livro", "play", "tv", "pessoas", "vassoura", "casa", "prato", "radio", "alvo", "trofeu", "relogio", "presente"];
+const copia = (o) => JSON.parse(JSON.stringify(o));
+
+function telaAjustes() {
+  const c = (estado.rascunho ??= copia(cfg()));
+  const premios = [0, 1, 2].map((i) => c.premios[i] || "");
+  const horas = [null, ...Array.from({ length: 17 }, (_, i) => i + 6)];
+  return `
+    <div class="titulo-secao"><h2>Ajustes <em>do Rally</em></h2></div>
+    <p class="dica">Mude o que precisar e toque em <b>Salvar alterações</b> no final. Vale na hora para todo mundo.</p>
+
+    <section class="bloco">
+      <h3>Período do Rally</h3>
+      <div class="duas-colunas">
+        <label class="campo"><span>Começa em</span><input type="date" id="aj-inicio" data-campo="inicio" value="${esc(c.inicio)}" /></label>
+        <label class="campo"><span>Termina em</span><input type="date" id="aj-fim" data-campo="fim" value="${esc(c.fim)}" /></label>
+      </div>
+    </section>
+
+    <section class="bloco">
+      <h3>Desafios</h3>
+      <p class="dica">Toque no ícone para trocar. Pontos de 1 a ${MAX_PONTOS}. Quem já marcou um desafio mantém os pontos que ganhou.</p>
+      <div class="lista-edicao">
+        ${c.desafios.map((d, i) => `
+          <div class="edita-desafio">
+            <button class="ic-botao" data-acao="trocar-icone" data-i="${i}" aria-label="Trocar ícone">${ICONES[d.icone] || ICONES.alvo}</button>
+            <input class="ed-titulo" id="aj-titulo-${i}" data-campo="titulo" data-i="${i}" value="${esc(d.titulo)}" maxlength="60" aria-label="Nome do desafio" />
+            <label class="ed-pontos"><input id="aj-pontos-${i}" type="number" inputmode="numeric" min="1" max="${MAX_PONTOS}" data-campo="pontos" data-i="${i}" value="${d.pontos}" aria-label="Pontos" /><span>pts</span></label>
+            <button class="acao perigo" data-acao="tirar-desafio" data-i="${i}">Tirar</button>
+          </div>`).join("") || `<div class="vazio">Nenhum desafio. Adicione pelo menos um.</div>`}
+      </div>
+      <button class="botao secundario" data-acao="novo-desafio">+ Adicionar desafio</button>
+    </section>
+
+    <section class="bloco">
+      <h3>Premiação</h3>
+      <p class="dica">Deixe em branco o lugar que não tem prêmio.</p>
+      ${premios.map((p, i) => `<label class="campo"><span>${i + 1}º lugar</span><input id="aj-premio-${i}" data-campo="premio" data-i="${i}" value="${esc(p)}" maxlength="80" /></label>`).join("")}
+    </section>
+
+    <section class="bloco">
+      <h3>Lembrete no celular</h3>
+      <p class="dica">Todo dia, nesse horário (de Brasília), quem ativou o lembrete recebe: "Não esqueça o Desafio do dia!"</p>
+      <label class="campo"><span>Horário</span>
+        <select id="aj-hora" data-campo="lembreteHora">
+          ${horas.map((h) => `<option value="${h ?? ""}" ${h === c.lembreteHora ? "selected" : ""}>${h === null ? "Desligado" : `${String(h).padStart(2, "0")}:00`}</option>`).join("")}
+        </select>
+      </label>
+    </section>
+
+    <div class="botoes-fixos">
+      <button class="botao" data-acao="salvar-ajustes">Salvar alterações</button>
+      <button class="botao secundario" data-acao="descartar-ajustes">Desfazer mudanças</button>
+    </div>
+
+    <section class="bloco">
+      <h3>Adicionar conta</h3>
+      <p class="dica">Crie a conta e passe o usuário e a senha para a pessoa.</p>
+      <label class="campo"><span>Nome completo</span><input id="nc-nome" maxlength="60" autocomplete="off" /></label>
+      <label class="campo"><span>Usuário</span><input id="nc-usuario" maxlength="30" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off" placeholder="ex: joao.silva" /></label>
+      <label class="campo"><span>Senha (mínimo 6)</span><input id="nc-senha" maxlength="40" autocomplete="off" /></label>
+      <button class="botao secundario" data-acao="criar-conta">Criar conta</button>
+      <p class="dica" style="margin-top:14px">Para <b>remover</b> uma conta, abra a pessoa no <b>Ranking</b>.</p>
+    </section>
+
+    ${estado.removidos.length ? `
+    <section class="bloco">
+      <h3>Contas removidas</h3>
+      <div class="lista">
+        ${estado.removidos.map((r) => `
+          <div class="item">
+            <span class="pos">${esc(iniciais(r.nome))}</span>
+            <span class="info"><strong>${esc(r.nome)}</strong><small>@${esc(r.usuario)}</small></span>
+            <button class="acao ok" data-acao="restaurar-conta" data-uid="${esc(r.uid)}">Restaurar</button>
+          </div>`).join("")}
+      </div>
+    </section>` : ""}`;
+}
+
+function validarAjustes(c) {
+  if (!c.inicio || !c.fim) return "Preencha as datas de começo e fim.";
+  if (c.inicio > c.fim) return "A data de começo precisa ser antes da data de fim.";
+  if (!c.desafios.length) return "Deixe pelo menos um desafio.";
+  for (const d of c.desafios) {
+    if (!d.titulo.trim()) return "Todo desafio precisa de um nome.";
+    if (!Number.isInteger(d.pontos) || d.pontos < 1 || d.pontos > MAX_PONTOS) return `Os pontos de "${d.titulo}" precisam ser de 1 a ${MAX_PONTOS}.`;
+  }
+  return "";
+}
+
+async function salvarAjustes() {
+  const c = estado.rascunho;
+  c.desafios.forEach((d) => (d.titulo = d.titulo.trim()));
+  const erro = validarAjustes(c);
+  if (erro) return toast(erro, true);
+  // Desafios que saíram continuam com nome no histórico de quem já marcou.
+  const atuais = new Set(c.desafios.map((d) => d.id));
+  const antigos = [...cfg().antigos.filter((a) => !atuais.has(a.id))];
+  for (const d of cfg().desafios) if (!atuais.has(d.id) && !antigos.some((a) => a.id === d.id)) antigos.push({ id: d.id, titulo: d.titulo, icone: d.icone });
+  const final = {
+    desafios: c.desafios.map(({ id, titulo, pontos, icone }) => ({ id, titulo, pontos, icone })),
+    antigos,
+    inicio: c.inicio,
+    fim: c.fim,
+    premios: c.premios.map((p) => (p || "").trim()),
+    lembreteHora: c.lembreteHora,
+  };
+  try {
+    await store.salvarConfig(final);
+    estado.config = final;
+    estado.rascunho = null;
+    render();
+    toast("Ajustes salvos! Já valem para todo mundo.");
+  } catch (e) { toast(e.message, true); }
+}
+
+async function criarContaAdmin() {
+  const nome = document.getElementById("nc-nome").value.trim();
+  const usuario = normalizarUsuario(document.getElementById("nc-usuario").value);
+  const senha = document.getElementById("nc-senha").value;
+  if (nome.length < 3) return toast("Digite o nome completo.", true);
+  if (usuario.length < 3) return toast("O usuário precisa ter pelo menos 3 letras (sem espaço).", true);
+  if (senha.length < 6) return toast("A senha precisa ter pelo menos 6 caracteres.", true);
+  try {
+    await store.criarConta(nome, usuario, senha);
+    await carregar();
+    render();
+    abrirFolha({ icone: "pessoas", titulo: "Conta criada!", texto: `Passe para ${esc(primeiroNome(nome))}:<br><br>Usuário: <b>${esc(usuario)}</b><br>Senha: <b>${esc(senha)}</b>`, cancelar: "Pronto" });
+  } catch (e) { toast(e.message, true); }
+}
+
+// ---------------------------------------------------------------------------
+//  Lembrete diário (notificação no celular)
+// ---------------------------------------------------------------------------
+const pushDisponivel = () => store.modo === "online" && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+const ehIphone = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+function cartaoLembrete() {
+  const hora = cfg().lembreteHora;
+  if (store.modo !== "online" || hora === null || hora === undefined) return "";
+  const hh = `${String(hora).padStart(2, "0")}h`;
+  if (!pushDisponivel()) {
+    return ehIphone()
+      ? `<div class="lembrete"><span>🔔</span><p>Para receber o lembrete do desafio no iPhone, instale o app: no Safari, toque em <b>Compartilhar</b> e depois em <b>Adicionar à Tela de Início</b>. Depois abra o app por lá.</p></div>`
+      : "";
+  }
+  if (Notification.permission === "denied") {
+    return `<div class="lembrete"><span>🔕</span><p>As notificações estão bloqueadas. Para receber o lembrete, libere as notificações deste site nas configurações do navegador.</p></div>`;
+  }
+  if (Notification.permission === "granted" && estado.lembreteAtivo) {
+    return `<div class="lembrete ok"><span>🔔</span><p>Lembrete ativado: todo dia às <b>${hh}</b>.</p></div>`;
+  }
+  return `<button class="lembrete botao-lembrete" data-acao="ativar-lembrete"><span>🔔</span><p><b>Ativar lembrete do Desafio do dia</b><br>Receba um aviso no celular todo dia às ${hh}.</p></button>`;
+}
+
+function chaveVapid() {
+  const b64 = VAPID_PUBLICA.replace(/-/g, "+").replace(/_/g, "/");
+  const bin = atob(b64 + "=".repeat((4 - (b64.length % 4)) % 4));
+  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+}
+
+async function ativarLembrete({ silencioso = false } = {}) {
+  if (!pushDisponivel()) return;
+  try {
+    if (!silencioso && Notification.permission !== "granted") {
+      if ((await Notification.requestPermission()) !== "granted") { render(); return toast("Sem permissão, o lembrete não pode ser enviado.", true); }
+    }
+    if (Notification.permission !== "granted") return;
+    const reg = await navigator.serviceWorker.ready;
+    const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chaveVapid() }));
+    await store.salvarInscricao(estado.usuario, sub);
+    estado.lembreteAtivo = true;
+    if (!silencioso) { render(); toast("Lembrete ativado! 🔔"); }
+  } catch (e) {
+    if (!silencioso) toast("Não foi possível ativar o lembrete neste celular.", true);
+  }
+}
+
+// ---------------------------------------------------------------------------
 //  Renderização e eventos
 // ---------------------------------------------------------------------------
 const TELAS = {
   desafios: telaDesafios, ranking: telaRanking, historico: telaHistorico, premios: telaPremios,
-  painel: telaPainel, integrantes: telaIntegrantes, registros: telaRegistros,
+  painel: telaPainel, registros: telaRegistros, ajustes: telaAjustes,
 };
 
 function render() {
@@ -473,7 +670,7 @@ async function tocarDesafio(id, el) {
   if (!ok) return;
   const rect = el.getBoundingClientRect();
   try {
-    await store.marcar(estado.usuario, id);
+    await store.marcar(estado.usuario, d);
     await carregar();
     render();
     comemorar(rect.left + rect.width / 2, rect.top + rect.height / 2, d.pontos);
@@ -483,7 +680,8 @@ async function tocarDesafio(id, el) {
 $app.addEventListener("click", async (e) => {
   const alvo = e.target.closest("button");
   if (!alvo) return;
-  const { acao, aba, desafio: idDesafio, integrante, status, id, filtro } = alvo.dataset;
+  const { acao, aba, desafio: idDesafio, integrante, status, id, filtro, i: idx, uid } = alvo.dataset;
+  const n = Number(idx);
 
   if (acao === "modo-login" || acao === "modo-cadastro") {
     estado.modoCadastro = acao === "modo-cadastro";
@@ -498,6 +696,55 @@ $app.addEventListener("click", async (e) => {
     return;
   }
   if (acao === "voltar") { estado.detalheUid = null; return render(); }
+  if (acao === "ativar-lembrete") return ativarLembrete();
+
+  // --- Ajustes (admin) ---
+  const r = estado.rascunho;
+  if (acao === "trocar-icone" && r) {
+    const d = r.desafios[n];
+    d.icone = ICONES_DESAFIO[(ICONES_DESAFIO.indexOf(d.icone) + 1) % ICONES_DESAFIO.length];
+    alvo.innerHTML = ICONES[d.icone];
+    return;
+  }
+  if (acao === "tirar-desafio" && r) {
+    const d = r.desafios[n];
+    if (!(await abrirFolha({ icone: d.icone, titulo: "Tirar desafio?", texto: `<b>${esc(d.titulo || "Sem nome")}</b> sai da lista quando você salvar. Quem já marcou mantém os pontos.`, confirmar: "Tirar", perigo: true }))) return;
+    r.desafios.splice(n, 1);
+    return render();
+  }
+  if (acao === "novo-desafio" && r) {
+    r.desafios.push({ id: `d-${Date.now().toString(36)}`, titulo: "", pontos: 50, icone: "alvo" });
+    render();
+    document.getElementById(`aj-titulo-${r.desafios.length - 1}`)?.focus();
+    return;
+  }
+  if (acao === "salvar-ajustes") return salvarAjustes();
+  if (acao === "descartar-ajustes") { estado.rascunho = null; render(); return toast("Mudanças desfeitas."); }
+  if (acao === "criar-conta") return criarContaAdmin();
+  if (acao === "remover-conta") {
+    const m = estado.usuarios.find((u) => u.uid === uid);
+    if (!m) return;
+    if (!(await abrirFolha({ icone: "pessoas", titulo: "Remover conta?", texto: `<b>${esc(m.nome)}</b> não vai mais conseguir entrar e sai do ranking. Dá para restaurar depois em Ajustes, com os pontos de volta.`, confirmar: "Remover", perigo: true }))) return;
+    try {
+      await store.removerConta(m);
+      estado.detalheUid = null;
+      await carregar();
+      render();
+      toast("Conta removida.");
+    } catch (err) { toast(err.message, true); }
+    return;
+  }
+  if (acao === "restaurar-conta") {
+    const rm = estado.removidos.find((x) => x.uid === uid);
+    if (!rm) return;
+    try {
+      await store.restaurarConta(rm);
+      await carregar();
+      render();
+      toast(`${primeiroNome(rm.nome)} voltou para o Rally.`);
+    } catch (err) { toast(err.message, true); }
+    return;
+  }
   if (aba) {
     estado.aba = aba;
     estado.detalheUid = null;
@@ -508,7 +755,7 @@ $app.addEventListener("click", async (e) => {
   }
   if (idDesafio) return tocarDesafio(idDesafio, alvo);
   if (integrante) {
-    estado.aba = "integrantes";
+    estado.aba = "ranking";
     estado.detalheUid = integrante;
     window.scrollTo({ top: 0 });
     return render();
@@ -526,6 +773,16 @@ $app.addEventListener("click", async (e) => {
 });
 
 $app.addEventListener("input", (e) => {
+  const { campo, i } = e.target.dataset;
+  if (campo && estado.rascunho) {
+    const r = estado.rascunho, v = e.target.value;
+    if (campo === "titulo") r.desafios[i].titulo = v;
+    else if (campo === "pontos") r.desafios[i].pontos = Math.round(Number(v));
+    else if (campo === "premio") r.premios[i] = v;
+    else if (campo === "lembreteHora") r.lembreteHora = v === "" ? null : Number(v);
+    else r[campo] = v;
+    return;
+  }
   if (e.target.id !== "busca") return;
   estado.busca = e.target.value;
   const pos = e.target.selectionStart;
@@ -545,15 +802,20 @@ $app.addEventListener("input", (e) => {
     $app.innerHTML = `<div class="login"><img src="assets/logo.png" class="login-logo" alt="" /><p class="aviso-demo">Não foi possível conectar. Verifique a internet e abra o app de novo.</p></div>`;
     return;
   }
-  store.aoMudarLogin(async (usuario) => {
+  store.aoMudarLogin(async (usuario, aviso) => {
     estado.usuario = usuario;
     estado.detalheUid = null;
+    estado.rascunho = null;
     estado.totalMostrado = 0;
+    estado.lembreteAtivo = false;
     if (usuario) {
       estado.aba = usuario.role === "admin" ? "painel" : "desafios";
       try { await carregar(); } catch (e) { toast(e.message, true); }
     }
     render();
+    if (aviso) toast(aviso, true);
+    // Quem já deu permissão tem a inscrição do lembrete renovada sem perguntar.
+    if (usuario) ativarLembrete({ silencioso: true }).then(() => estado.lembreteAtivo && estado.aba === "desafios" && render());
   });
 })();
 
