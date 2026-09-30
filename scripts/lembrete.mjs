@@ -97,5 +97,6 @@ for (const doc of inscricoes) {
   }
 }
 
-await req(`${DOCS}/config/envio?updateMask.fieldPaths=ultimaData`, { metodo: "PATCH", token, corpo: { fields: { ultimaData: { stringValue: hoje } } } });
+// Envio de teste (forçado) não conta como o lembrete do dia.
+if (!forcar) await req(`${DOCS}/config/envio?updateMask.fieldPaths=ultimaData`, { metodo: "PATCH", token, corpo: { fields: { ultimaData: { stringValue: hoje } } } });
 console.log(`Lembrete enviado para ${enviados} celular(es). Inscrições vencidas apagadas: ${removidos}. Falhas: ${falhas}.`);
