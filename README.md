@@ -135,13 +135,15 @@ Faça isso uma vez, com a conta Google do estúdio:
 2. No topo, clique em **Selecionar projeto > Novo projeto**. Nome: `Durães APP`. **Criar**.
 3. Menu ☰ > **APIs e serviços > Biblioteca**. Pesquise **Google Drive API** e clique em **Ativar**.
 4. Menu ☰ > **APIs e serviços > Tela de permissão OAuth** (em algumas contas aparece como
-   **Google Auth Platform**). Clique em **Começar**:
-   - Nome do app: `Durães APP`. E-mail de suporte: o de vocês.
-   - Público: **Externo**. Contato: o e-mail de vocês. Aceite e clique em **Criar**.
-   - Em **Público**, clique em **Publicar app** (fica "Em produção"). Sem isso o Google pede login
-     de novo a cada 7 dias.
-5. Menu ☰ > **APIs e serviços > Credenciais > Criar credenciais > ID do cliente OAuth**
-   (ou **Clientes > Criar cliente**):
+   **Google Auth Platform**). Clique em **Começar**. Público: **Externo**. Depois:
+   - **Branding** (menu da esquerda): nome do app `Durães APP`, e-mail de suporte e e-mail de
+     contato do desenvolvedor = o de vocês. **Não envie logotipo** (logo exige verificação do
+     Google, que leva semanas) e deixe os campos de domínio em branco. **Salvar**.
+   - **Público-alvo**: clique em **Publicar app** e confirme (fica "Em produção"). Sem isso o
+     Google pede login de novo a cada 7 dias. Se o botão continuar cinza, dá para usar mesmo
+     assim: em **Usuários de teste** adicione o e-mail de vocês (aí o login vale por 7 dias).
+5. **Clientes** (menu da esquerda) **> Criar cliente** (ou Menu ☰ > **APIs e serviços >
+   Credenciais > Criar credenciais > ID do cliente OAuth**):
    - Tipo de aplicativo: **App para computador**. Nome: `Durães APP`. **Criar**.
    - Clique em **Baixar JSON** e salve o arquivo.
 6. No Durães APP, aba **Clientes**: **Escolher arquivo do Google (.json)**, escolha o arquivo
