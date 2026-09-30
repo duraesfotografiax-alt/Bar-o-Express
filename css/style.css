@@ -259,3 +259,17 @@ img { max-width: 100%; display: block; }
 .lembrete.ok { border-style: solid; border-color: rgba(46, 204, 113, 0.4); }
 .botao-lembrete { border-style: solid; border-color: var(--laranja); background: rgba(255, 162, 0, 0.1); }
 .botao-lembrete:active { transform: scale(0.98); }
+
+/* Correção de pontos (administrador) */
+.botoes-correcao { margin-top: 12px; }
+.botoes-correcao .botao { margin-top: 0; }
+.total-exato { margin-top: 14px; }
+.total-exato summary { cursor: pointer; color: var(--laranja); font-weight: 800; font-size: 0.9rem; padding: 6px 0; }
+.linha-total { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin: 8px 0; }
+.linha-total input { min-width: 0; padding: 12px 14px; border-radius: 14px; border: 2px solid var(--linha); background: var(--preto); font-weight: 800; font-size: 1rem; outline: none; }
+.linha-total input:focus { border-color: var(--laranja); }
+.linha-total .botao { width: auto; margin: 0; padding: 12px 18px; }
+.item.correcao { border-style: dashed; border-color: rgba(255, 162, 0, 0.45); }
+.item.correcao .pos { color: var(--laranja); }
+.item.correcao.negativa { border-color: rgba(229, 57, 53, 0.5); }
+.item.correcao.negativa .valor, .item.correcao.negativa .pos { color: #ff6b6b; }

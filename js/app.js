@@ -2,7 +2,7 @@ import { DESAFIOS, DESAFIOS_ANTIGOS, PREMIOS, RALLY, LEMBRETE_HORA, VAPID_PUBLIC
 import { store, hoje, normalizarUsuario } from "./store.js";
 import { ICONES } from "./icons.js";
 
-const VERSAO_APP = "versão 6";
+const VERSAO_APP = "versão 7";
 const $app = document.getElementById("app");
 const $toast = document.getElementById("toast");
 
@@ -30,6 +30,7 @@ const PADRAO = {
   fim: RALLY.fim,
   premios: PREMIOS.individuais.map((p) => p.premio),
   lembreteHora: LEMBRETE_HORA,
+  correcoes: [], // pontos dados ou tirados à mão pelo administrador
 };
 const cfg = () => ({ ...PADRAO, ...(estado.config || {}) });
 const MAX_PONTOS = 300; // limite também conferido nas regras do Firestore
@@ -58,13 +59,19 @@ const nomeDia = (iso) => {
   return dataLocal(iso).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" });
 };
 
-const valido = (r) => r.status === "ok" && r.data >= cfg().inicio && r.data <= cfg().fim;
+// Correções do administrador valem a partir do início do Rally, mesmo feitas depois do fim.
+const valido = (r) =>
+  r.tipo === "correcao" ? r.data >= cfg().inicio : r.status === "ok" && r.data >= cfg().inicio && r.data <= cfg().fim;
+const correcoes = () => (cfg().correcoes || []).map((c) => ({ ...c, tipo: "correcao", status: "ok" }));
+// Registros de desafios + correções de pontos (de uma pessoa, ou de todos).
+const itens = (uid) => [...estado.registros, ...correcoes()].filter((r) => !uid || r.uid === uid);
+const sinal = (n) => (n < 0 ? `−${fmt(-n)}` : `+${fmt(n)}`);
 // Todos participam do Rally, inclusive o administrador.
 const membros = () => estado.usuarios;
 
 function ranking() {
   const totais = new Map(membros().map((u) => [u.uid, 0]));
-  for (const r of estado.registros) if (valido(r) && totais.has(r.uid)) totais.set(r.uid, totais.get(r.uid) + r.pontos);
+  for (const r of itens()) if (valido(r) && totais.has(r.uid)) totais.set(r.uid, totais.get(r.uid) + r.pontos);
   return membros()
     .map((u) => ({ ...u, total: totais.get(u.uid) }))
     .sort((a, b) => b.total - a.total || a.nome.localeCompare(b.nome));
@@ -224,7 +231,7 @@ function telaDesafios() {
   const u = estado.usuario;
   const meus = estado.registros.filter((r) => r.uid === u.uid);
   const deHoje = new Map(meus.filter((r) => r.data === hoje()).map((r) => [r.desafioId, r]));
-  const total = meus.filter(valido).reduce((s, r) => s + r.pontos, 0);
+  const total = itens(u.uid).filter(valido).reduce((s, r) => s + r.pontos, 0);
   const ptsHoje = [...deHoje.values()].filter(valido).reduce((s, r) => s + r.pontos, 0);
   const pos = ranking().findIndex((m) => m.uid === u.uid) + 1;
   const { desafios, inicio, fim } = cfg();
@@ -305,9 +312,10 @@ function listaRegistros(registros, { admin = false, mostrarNome = false } = {}) 
   return grupos.map(([data, rs]) => {
     const soma = rs.filter(valido).reduce((s, r) => s + r.pontos, 0);
     return `
-      <div class="dia"><span>${nomeDia(data)}</span><b>+${fmt(soma)} pts</b></div>
+      <div class="dia"><span>${nomeDia(data)}</span><b>${sinal(soma)} pts</b></div>
       <div class="lista">
         ${rs.map((r) => {
+          if (r.tipo === "correcao") return itemCorrecao(r, { admin, mostrarNome });
           const d = desafio(r.desafioId);
           const rej = r.status === "rejeitado";
           return `
@@ -329,8 +337,22 @@ function listaRegistros(registros, { admin = false, mostrarNome = false } = {}) 
   }).join("");
 }
 
+function itemCorrecao(c, { admin, mostrarNome }) {
+  const hora = new Date(c.criadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return `
+          <div class="item correcao ${c.pontos < 0 ? "negativa" : ""}">
+            <span class="pos">${ICONES.ajuste}</span>
+            <span class="info">
+              <strong>${esc(c.motivo || "Correção de pontos")}</strong>
+              <small>${mostrarNome ? `${esc(c.nome)} · ` : ""}Correção do administrador · ${hora}</small>
+            </span>
+            <span class="valor">${sinal(c.pontos)}</span>
+            ${admin ? `<button class="acao" data-acao="desfazer-correcao" data-id="${esc(c.id)}">Desfazer</button>` : ""}
+          </div>`;
+}
+
 function telaHistorico() {
-  const meus = estado.registros.filter((r) => r.uid === estado.usuario.uid);
+  const meus = itens(estado.usuario.uid);
   return `
     <div class="titulo-secao"><h2>Meu <em>histórico</em></h2><span>${meus.length} registros</span></div>
     ${listaRegistros(meus)}`;
@@ -391,8 +413,8 @@ function telaPainel() {
 function telaDetalhe() {
   const m = ranking().find((x) => x.uid === estado.detalheUid);
   if (!m) { estado.detalheUid = null; return telaRanking(); }
-  const regs = estado.registros.filter((r) => r.uid === m.uid);
-  const dias = new Set(regs.filter(valido).map((r) => r.data)).size;
+  const regs = itens(m.uid);
+  const dias = new Set(regs.filter((r) => r.tipo !== "correcao" && valido(r)).map((r) => r.data)).size;
   const souEu = m.uid === estado.usuario.uid;
   return `
     <button class="voltar" data-acao="voltar">${ICONES.voltar} Ranking</button>
@@ -400,9 +422,29 @@ function telaDetalhe() {
       <div class="rotulo">${esc(m.nome)} · @${esc(m.usuario)}</div>
       <div class="total">${fmt(m.total)}<small>pts</small></div>
       <div class="linha-info">
-        <span class="chip">${regs.length} registros</span>
+        <span class="chip">${regs.filter((r) => r.tipo !== "correcao").length} atividades</span>
         <span class="chip">${dias} ${dias === 1 ? "dia ativo" : "dias ativos"}</span>
       </div>
+    </section>
+    <section class="bloco">
+      <h3>Corrigir pontos</h3>
+      <p class="dica">Tire ou dê pontos sem mexer nas atividades. A correção aparece no histórico da pessoa, com o motivo.</p>
+      <div class="duas-colunas">
+        <label class="campo"><span>Pontos</span><input id="cp-pontos" type="number" inputmode="numeric" min="1" placeholder="ex: 50" /></label>
+        <label class="campo"><span>Motivo</span><input id="cp-motivo" maxlength="80" placeholder="ex: faltou ao culto" /></label>
+      </div>
+      <div class="duas-colunas botoes-correcao">
+        <button class="botao perigo-contorno" data-acao="corrigir" data-sinal="-1">− Tirar</button>
+        <button class="botao" data-acao="corrigir" data-sinal="1">+ Dar</button>
+      </div>
+      <details class="total-exato">
+        <summary>Definir o total exato</summary>
+        <div class="linha-total">
+          <input id="cp-total" type="number" inputmode="numeric" value="${m.total}" aria-label="Novo total" />
+          <button class="botao secundario" data-acao="definir-total" data-uid="${esc(m.uid)}">Definir</button>
+        </div>
+        <p class="dica">Hoje: ${fmt(m.total)} pts. O app lança a diferença como uma correção.</p>
+      </details>
     </section>
     <div class="titulo-secao"><h2>Registros</h2><span>rejeite o que não foi feito</span></div>
     ${listaRegistros(regs, { admin: true })}
@@ -539,12 +581,23 @@ async function salvarAjustes() {
     lembreteHora: c.lembreteHora,
   };
   try {
+    // Pega as correções mais recentes do banco para não apagar nenhuma.
+    final.correcoes = (await store.lerConfig())?.correcoes || cfg().correcoes || [];
     await store.salvarConfig(final);
     estado.config = final;
     estado.rascunho = null;
     render();
     toast("Ajustes salvos! Já valem para todo mundo.");
   } catch (e) { toast(e.message, true); }
+}
+
+// Correções de pontos ficam junto dos ajustes do Rally (config/rally).
+// Sempre relê o banco antes de gravar, para não perder nada.
+async function mudarCorrecoes(fn) {
+  const atual = (await store.lerConfig()) || {};
+  const novo = { ...atual, correcoes: fn(atual.correcoes || []) };
+  await store.salvarConfig(novo);
+  estado.config = novo;
 }
 
 async function criarContaAdmin() {
@@ -731,6 +784,45 @@ $app.addEventListener("click", async (e) => {
       await carregar();
       render();
       toast("Conta removida.");
+    } catch (err) { toast(err.message, true); }
+    return;
+  }
+  if (acao === "corrigir" || acao === "definir-total") {
+    const m = ranking().find((x) => x.uid === estado.detalheUid);
+    if (!m) return;
+    const motivo = document.getElementById("cp-motivo").value.trim();
+    let pontos;
+    if (acao === "corrigir") {
+      const qtd = Math.round(Number(document.getElementById("cp-pontos").value));
+      if (!qtd || qtd < 1) return toast("Digite quantos pontos.", true);
+      pontos = qtd * Number(alvo.dataset.sinal);
+    } else {
+      const novo = Math.round(Number(document.getElementById("cp-total").value));
+      if (!Number.isFinite(novo) || document.getElementById("cp-total").value === "") return toast("Digite o novo total.", true);
+      pontos = novo - m.total;
+      if (!pontos) return toast("O total já é esse.");
+    }
+    const texto = `${pontos < 0 ? "Tirar" : "Dar"} <b>${fmt(Math.abs(pontos))} pontos</b> ${pontos < 0 ? "de" : "para"} <b>${esc(m.nome)}</b>?<br>Total vai de ${fmt(m.total)} para <b>${fmt(m.total + pontos)}</b>.`;
+    if (!(await abrirFolha({ icone: "ajuste", titulo: "Corrigir pontos", texto, confirmar: "Confirmar", perigo: pontos < 0 }))) return;
+    try {
+      await mudarCorrecoes((lista) => [...lista, {
+        id: `c-${Date.now().toString(36)}`, uid: m.uid, nome: m.nome, pontos,
+        motivo: motivo || (acao === "definir-total" ? "Total ajustado pelo administrador" : ""),
+        data: hoje(), criadoEm: Date.now(),
+      }]);
+      render();
+      toast(`Pontos corrigidos: ${sinal(pontos)}.`);
+    } catch (err) { toast(err.message, true); }
+    return;
+  }
+  if (acao === "desfazer-correcao") {
+    const c = correcoes().find((x) => x.id === id);
+    if (!c) return;
+    if (!(await abrirFolha({ icone: "ajuste", titulo: "Desfazer correção?", texto: `A correção de <b>${sinal(c.pontos)} pontos</b> de ${esc(c.nome)} será apagada.`, confirmar: "Desfazer", perigo: true }))) return;
+    try {
+      await mudarCorrecoes((lista) => lista.filter((x) => x.id !== id));
+      render();
+      toast("Correção desfeita.");
     } catch (err) { toast(err.message, true); }
     return;
   }
