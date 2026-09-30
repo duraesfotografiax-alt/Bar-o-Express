@@ -22,8 +22,8 @@ subir nada para a internet. Tudo roda no seu computador.
    foto com as outras da mesma câmera.
 8. **Exporta renomeado** (`Casamento_Ana_Joao_0001.jpg`…), com versão leve opcional para
    WhatsApp/Instagram (pasta `web`), e um `relatorio.csv` que abre no Excel.
-9. **Nuvem**: guarda os presets numa pasta do OneDrive/Google Drive/Dropbox (aparecem em todos os
-   computadores do estúdio) e pode salvar as fotos editadas direto na pasta de entrega da nuvem.
+9. **Entrega na nuvem**: salva as fotos editadas direto numa pasta do OneDrive/Google Drive/Dropbox,
+   pronta para compartilhar com o cliente.
 
 ## Vindo do Lightroom
 
@@ -50,21 +50,18 @@ Depois de importar, confira no antes/depois e clique em **Salvar** para virar um
 O que **ainda não** é importado (o EditaLote avisa quando encontra): Remover névoa, Gradação de
 cor, Vinheta, Granulação, Redução de ruído e máscaras/ajustes locais.
 
-## Nuvem
+## Entrega na nuvem
 
-O EditaLote usa a pasta que o OneDrive, o Google Drive para computador ou o Dropbox já
-sincronizam. Ele não precisa de senha nem de conta: o programa da nuvem faz o envio.
+Na seção **5. Entrega na nuvem** da tela, escolha a pasta do OneDrive, Google Drive para
+computador ou Dropbox (o EditaLote encontra sozinho; se não achar, use **Outra**) e clique em
+**Salvar as editadas na nuvem**. A pasta de saída passa a ser
+`…/EditaLote/Entregas/<nome do evento>`, e o programa da nuvem envia as fotos sozinho. Depois é só
+compartilhar essa pasta com o cliente pelo próprio OneDrive/Google Drive.
 
-- **Guardar presets na nuvem** (seção 5 da tela): os presets passam a ficar em
-  `…/EditaLote/presets` dentro da nuvem. Em outro computador, abra o EditaLote, escolha a mesma
-  pasta e clique no mesmo botão. Os dois computadores passam a usar os mesmos presets. Se a nuvem
-  estiver desconectada, o programa volta a usar os presets locais.
-- **Salvar as editadas na nuvem**: o botão **Nuvem**, ao lado da pasta de saída, preenche
-  `…/EditaLote/Entregas/<nome do evento>`. Dá para compartilhar essa pasta com o cliente pelo
-  próprio OneDrive/Google Drive.
-  - Atenção ao espaço: 2.000 fotos ocupam uns 10–16 GB (o Google Drive grátis tem 15 GB).
-- **De volta para o Lightroom**: se quiserem as editadas também no Lightroom da nuvem, é só
-  importar a pasta de saída nele.
+- O EditaLote não pede senha nem conta: quem envia é o programa da nuvem instalado no computador.
+- Atenção ao espaço: 2.000 fotos ocupam uns 10–16 GB (o Google Drive grátis tem 15 GB).
+- Os presets continuam só neste computador, na pasta `presets` ao lado do programa.
+- Se quiserem as editadas também no Lightroom da nuvem, é só importar a pasta de saída nele.
 
 ## Qualidade
 
@@ -137,7 +134,7 @@ Estrutura:
 | `editalote/lut_cube.py` | leitura de LUTs `.cube` |
 | `editalote/metadados.py` | EXIF: câmera, número de série, horário |
 | `editalote/lightroom.py` | importa presets `.xmp` e edições salvas nas fotos |
-| `editalote/nuvem.py` | pastas do OneDrive/Google Drive/Dropbox e configuração |
+| `editalote/nuvem.py` | acha as pastas do OneDrive/Google Drive/Dropbox para a entrega |
 | `editalote/lote.py` | ordem por horário, renomeação, processamento paralelo, desfocadas, relatório |
 | `editalote/servidor.py` | servidor local (só `127.0.0.1`) |
 | `editalote/estatico/index.html` | tela |

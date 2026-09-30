@@ -27,6 +27,7 @@ if getattr(sys, "frozen", False):
 else:
     RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     PASTA_ESTATICA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "estatico")
+PASTA_PRESETS = os.path.join(RAIZ, "presets")
 
 app = Flask(__name__, static_folder=None)
 _trabalho: Trabalho | None = None
@@ -84,25 +85,8 @@ def presets_lightroom():
 
 
 @app.get("/api/nuvem")
-def estado_nuvem():
-    config = nuvem.ler_config(RAIZ)
-    pasta = nuvem.pasta_presets(RAIZ)
-    return jsonify({
-        "pastas": nuvem.detectar_nuvens(),
-        "pasta_nuvem": config.get("pasta_nuvem") or "",
-        "pasta_presets": pasta,
-        "presets_na_nuvem": pasta != os.path.join(RAIZ, "presets"),
-    })
-
-
-@app.post("/api/nuvem")
-def configurar_nuvem():
-    caminho = (request.json or {}).get("caminho", "")
-    try:
-        pasta = nuvem.usar_nuvem_para_presets(RAIZ, caminho or None)
-    except (ValueError, OSError) as erro:
-        return jsonify({"erro": str(erro)}), 400
-    return jsonify({"pasta_presets": pasta})
+def pastas_nuvem():
+    return jsonify(nuvem.detectar_nuvens())
 
 
 @app.post("/api/nuvem/entrega")
@@ -150,11 +134,10 @@ def previa():
 @app.get("/api/presets")
 def listar_presets():
     presets = []
-    pasta = nuvem.pasta_presets(RAIZ)
-    os.makedirs(pasta, exist_ok=True)
-    for nome in sorted(os.listdir(pasta)):
+    os.makedirs(PASTA_PRESETS, exist_ok=True)
+    for nome in sorted(os.listdir(PASTA_PRESETS)):
         if nome.endswith(".json"):
-            with open(os.path.join(pasta, nome), encoding="utf-8") as f:
+            with open(os.path.join(PASTA_PRESETS, nome), encoding="utf-8") as f:
                 presets.append({"arquivo": nome, **json.load(f)})
     return jsonify(presets)
 
@@ -166,9 +149,8 @@ def salvar_preset():
     if not nome:
         return jsonify({"erro": "Dê um nome ao preset"}), 400
     arquivo = re.sub(r"[^a-z0-9]+", "-", nome.lower()).strip("-") or "preset"
-    pasta = nuvem.pasta_presets(RAIZ)
-    os.makedirs(pasta, exist_ok=True)
-    caminho = os.path.join(pasta, f"{arquivo}.json")
+    os.makedirs(PASTA_PRESETS, exist_ok=True)
+    caminho = os.path.join(PASTA_PRESETS, f"{arquivo}.json")
     with open(caminho, "w", encoding="utf-8") as f:
         json.dump(ajustes, f, ensure_ascii=False, indent=2)
     return jsonify({"arquivo": f"{arquivo}.json"})

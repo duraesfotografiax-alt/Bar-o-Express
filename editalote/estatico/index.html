@@ -100,8 +100,7 @@
         <button onclick="escolher('entrada')">Procurar</button></div>
       <label>Salvar as fotos editadas em</label>
       <div class="linha"><input type="text" id="saida" placeholder="C:\Fotos\Casamento Ana e João - Editadas">
-        <button onclick="escolher('saida')">Procurar</button>
-        <button onclick="saidaNaNuvem()" title="Salvar as editadas na pasta da nuvem (seção 5)">Nuvem</button></div>
+        <button onclick="escolher('saida')">Procurar</button></div>
       <div class="linha" style="margin-top:8px"><button onclick="escanear()">Carregar fotos</button>
         <span id="resumo" class="dica"></span></div>
     </section>
@@ -158,15 +157,12 @@
     </section>
 
     <section>
-      <h2>5. Nuvem</h2>
-      <p class="dica">Use a pasta do OneDrive, Google Drive ou Dropbox deste computador. O programa
-        da nuvem sincroniza sozinho: os presets aparecem em todos os computadores do estúdio.</p>
+      <h2>5. Entrega na nuvem</h2>
+      <p class="dica">Salva as fotos editadas na pasta do OneDrive, Google Drive ou Dropbox deste
+        computador. O programa da nuvem envia sozinho, e dá para compartilhar a pasta com o cliente.</p>
       <div class="linha"><select id="nuvens"></select>
         <button onclick="escolherNuvem()">Outra</button></div>
-      <div class="linha" style="margin-top:6px; flex-wrap: wrap">
-        <button onclick="presetsNaNuvem()">Guardar presets na nuvem</button>
-        <button onclick="presetsLocais()" id="btnLocal" style="display:none">Voltar para este PC</button>
-      </div>
+      <button style="margin-top:6px" onclick="saidaNaNuvem()">Salvar as editadas na nuvem</button>
       <p id="nuvemMsg" class="dica"></p>
     </section>
 
@@ -272,14 +268,12 @@ async function api(url, corpo) {
   return dados;
 }
 
-async function carregarPresets(selecionar, aplicar = true) {
-  const anterior = presets[$("preset").value]?.arquivo;
+async function carregarPresets(selecionar) {
   presets = await api("/api/presets");
   $("preset").innerHTML = presets.map((p, i) => `<option value="${i}">${esc(p.nome)}</option>`).join("");
-  const alvo = selecionar || (!aplicar && anterior);
-  const i = alvo ? presets.findIndex(p => p.arquivo === alvo) : 0;
+  const i = selecionar ? presets.findIndex(p => p.arquivo === selecionar) : 0;
   $("preset").value = Math.max(0, i);
-  if (aplicar) usarPreset();  // só troca os ajustes quando pedido (não perde o que não foi salvo)
+  usarPreset();
 }
 function usarPreset() {
   const p = presets[$("preset").value] || {};
@@ -595,42 +589,37 @@ function fecharProgresso() { $("progresso").style.display = "none"; }
 async function abrirSaida() { await api("/api/abrir-pasta", {pasta: $("saida").value.trim()}); }
 
 // ---------------------------------------------------------------- nuvem
+const CHAVE_NUVEM = "editalote.nuvem";
+function lembrar(valor) { try { localStorage.setItem(CHAVE_NUVEM, valor); } catch (e) {} }
+function lembrada() { try { return localStorage.getItem(CHAVE_NUVEM) || ""; } catch (e) { return ""; } }
+function adicionarNuvem(caminho, texto) {
+  const op = document.createElement("option");
+  op.value = caminho; op.textContent = texto || caminho;
+  $("nuvens").prepend(op);
+}
 async function carregarNuvem() {
-  const r = await api("/api/nuvem");
-  const opcoes = r.pastas.map(p => `<option value="${esc(p.caminho)}">${esc(p.nome)} — ${esc(p.caminho)}</option>`);
-  if (r.pasta_nuvem && !r.pastas.some(p => p.caminho === r.pasta_nuvem))
-    opcoes.unshift(`<option value="${esc(r.pasta_nuvem)}">${esc(r.pasta_nuvem)}</option>`);
-  $("nuvens").innerHTML = opcoes.length ? opcoes.join("") : `<option value="">Nenhuma pasta de nuvem encontrada — use "Outra"</option>`;
-  if (r.pasta_nuvem) $("nuvens").value = r.pasta_nuvem;
-  $("btnLocal").style.display = r.presets_na_nuvem ? "" : "none";
-  $("nuvemMsg").innerHTML = r.presets_na_nuvem
-    ? `<span class="nuvem-ok">✓ Presets sincronizados em</span> ${esc(r.pasta_presets)}`
-    : `Presets guardados só neste computador.`;
+  const pastas = await api("/api/nuvem");
+  $("nuvens").innerHTML = pastas.map(p => `<option value="${esc(p.caminho)}">${esc(p.nome)} — ${esc(p.caminho)}</option>`).join("");
+  const anterior = lembrada();
+  if (anterior && !pastas.some(p => p.caminho === anterior)) adicionarNuvem(anterior);
+  if (anterior) $("nuvens").value = anterior;
+  if (!$("nuvens").options.length)
+    $("nuvens").innerHTML = `<option value="">Nenhuma pasta de nuvem encontrada — use "Outra"</option>`;
 }
 async function escolherNuvem() {
   const r = await api("/api/escolher", {tipo: "pasta"});
   if (!r.caminho) return;
-  const op = document.createElement("option");
-  op.value = r.caminho; op.textContent = r.caminho;
-  $("nuvens").prepend(op); $("nuvens").value = r.caminho;
-}
-async function presetsNaNuvem() {
-  const caminho = $("nuvens").value;
-  if (!caminho) { alert("Escolha a pasta da nuvem (OneDrive, Google Drive…)"); return; }
-  try { await api("/api/nuvem", {caminho}); } catch (e) { alert(e.message); return; }
-  await carregarNuvem(); await carregarPresets(null, false);
-}
-async function presetsLocais() {
-  await api("/api/nuvem", {caminho: ""});
-  await carregarNuvem(); await carregarPresets(null, false);
+  adicionarNuvem(r.caminho); $("nuvens").value = r.caminho; lembrar(r.caminho);
 }
 async function saidaNaNuvem() {
   const nuvem = $("nuvens").value;
-  if (!nuvem) { alert("Escolha a pasta da nuvem na seção 5"); return; }
+  if (!nuvem) { alert("Escolha a pasta da nuvem (OneDrive, Google Drive…)"); return; }
+  lembrar(nuvem);
   const entrada = $("entrada").value.trim().replace(/[\\/]+$/, "");
   const evento = entrada ? entrada.split(/[\\/]/).pop() : $("prefixo").value;
   const r = await api("/api/nuvem/entrega", {nuvem, evento});
   $("saida").value = r.caminho;
+  $("nuvemMsg").textContent = "As editadas vão para: " + r.caminho + ".";
   $("msg").textContent = "Atenção: 2.000 fotos ocupam uns 10–16 GB. Confira se o plano da nuvem tem espaço (o Google Drive grátis tem 15 GB).";
 }
 
