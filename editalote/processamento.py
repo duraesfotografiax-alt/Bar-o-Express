@@ -24,7 +24,7 @@ PESOS_Y = np.array([0.2126, 0.7152, 0.0722], dtype=np.float64)
 
 AJUSTES_PADRAO: dict = {
     "nome": "Natural",
-    "auto_exposicao": 0.5,       # 0 = desligado, 1 = corrige tudo
+    "auto_exposicao": 0.7,       # 0 = desligado, 1 = corrige tudo
     "auto_balanco_branco": 0.4,  # 0 = desligado, 1 = neutro total
     "exposicao": 0.0,            # em EV (stops), -2..2
     "contraste": 0,              # -100..100
@@ -51,6 +51,8 @@ AJUSTES_PADRAO: dict = {
     "curva_b": None,
     "lut": None,                 # caminho de arquivo .cube
     "lut_intensidade": 100,      # 0..100
+    "estilo_ia": None,           # modelo da IA de estilo (presets/estilos/*.json)
+    "ia_forca": 100,             # 0..100: quanto a IA ajusta cada foto
     "cameras": {},               # ajustes finos por câmera (ver ajustes_para_camera)
 }
 
@@ -65,7 +67,7 @@ for _cor, _ in CORES_HSL:
 CAMPOS_POR_CAMERA = ("exposicao", "temperatura", "matiz", "saturacao")
 
 
-CAMPOS_ANULAVEIS = ("lut", "curva", "curva_r", "curva_g", "curva_b")
+CAMPOS_ANULAVEIS = ("lut", "curva", "curva_r", "curva_g", "curva_b", "estilo_ia")
 
 
 def completar_ajustes(ajustes: dict | None) -> dict:
@@ -254,8 +256,8 @@ def analisar(img: Image.Image) -> Analise:
     base = y_lin[validos] if validos.sum() > 500 else y_lin.ravel()
     media_log = float(np.exp(np.mean(np.log(base + 1e-4), dtype=np.float64)))
     ev = float(np.log2(0.18 / max(media_log, 1e-4)))
-    # zona de tolerância: foto até ~1/3 de stop do alvo fica como o fotógrafo fez
-    ev = float(np.sign(ev) * max(0.0, abs(ev) - 0.3))
+    # zona de tolerância: foto até ~1/6 de stop do alvo fica como o fotógrafo fez
+    ev = float(np.sign(ev) * max(0.0, abs(ev) - 0.15))
     ev = float(np.clip(ev, -1.0, 1.5))
     if ev > 0:
         # não empurra os realces (vestido de noiva!) além do branco
@@ -441,15 +443,20 @@ def carregar_lut(ajustes: dict) -> LutCube | None:
     return LutCube.abrir(caminho) if caminho else None
 
 
-def previa_jpeg(caminho: str, ajustes: dict, lado: int = 1400) -> bytes:
-    """Gera uma prévia reduzida já editada (mesma análise usada na exportação)."""
+def previa_jpeg(caminho: str, ajustes: dict, lado: int = 1400) -> tuple[bytes, dict]:
+    """Prévia reduzida já editada (mesma análise e mesma IA da exportação).
+
+    Retorna (jpeg, ajustes que a IA de estilo acrescentou nesta foto).
+    """
+    from .estilo_ia import ajustes_da_foto
     from .metadados import ler_info
 
     ajustes = ajustes_para_camera(completar_ajustes(ajustes), ler_info(caminho).camera)
+    ajustes, ajuste_ia = ajustes_da_foto(ajustes, caminho)
     reduzida = carregar_reduzida(caminho)
     analise = analisar(reduzida)
     reduzida.thumbnail((lado, lado), Image.Resampling.LANCZOS)
     editada = aplicar(reduzida, ajustes, analise, carregar_lut(ajustes))
     buf = io.BytesIO()
     editada.save(buf, "JPEG", quality=90)
-    return buf.getvalue()
+    return buf.getvalue(), ajuste_ia

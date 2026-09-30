@@ -3,188 +3,172 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>EditaLote</title>
-<style>
-  :root {
-    --fundo: #141517; --painel: #1d1f22; --borda: #2c2f33; --texto: #e7e7e9;
-    --suave: #9a9ea5; --destaque: #e0a458; --ok: #6cc18a; --erro: #e06c6c;
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--fundo); color: var(--texto);
-         font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  header { padding: 12px 20px; border-bottom: 1px solid var(--borda); display: flex;
-           align-items: baseline; gap: 12px; }
-  header h1 { margin: 0; font-size: 18px; }
-  header span { color: var(--suave); }
-  main { display: grid; grid-template-columns: 380px 1fr; height: calc(100vh - 49px); }
-  aside { overflow-y: auto; border-right: 1px solid var(--borda); padding: 12px 16px 80px; }
-  section { margin-bottom: 18px; }
-  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--suave);
-       margin: 0 0 8px; }
-  label { display: block; color: var(--suave); font-size: 12px; margin: 8px 0 3px; }
-  input[type=text], input[type=number], select {
-    width: 100%; background: var(--painel); color: var(--texto); border: 1px solid var(--borda);
-    border-radius: 6px; padding: 7px 8px; font: inherit; }
-  .linha { display: flex; gap: 6px; align-items: center; }
-  .linha > input[type=text] { flex: 1; }
-  button { background: var(--painel); color: var(--texto); border: 1px solid var(--borda);
-           border-radius: 6px; padding: 7px 12px; font: inherit; cursor: pointer; white-space: nowrap; }
-  button:hover { border-color: var(--suave); }
-  button.principal { background: var(--destaque); color: #1a1206; border: 0; font-weight: 600;
-                     width: 100%; padding: 12px; font-size: 15px; }
-  button:disabled { opacity: .5; cursor: default; }
-  .slider { display: grid; grid-template-columns: 110px 1fr 44px; align-items: center; gap: 8px;
-            margin: 4px 0; }
-  .slider span { color: var(--suave); font-size: 12px; }
-  .slider output { text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; }
-  input[type=range] { width: 100%; accent-color: var(--destaque); }
-  .check { display: flex; gap: 8px; align-items: center; margin: 6px 0; color: var(--texto); font-size: 13px; }
-  .camera { background: var(--painel); border: 1px solid var(--borda); border-radius: 8px;
-            padding: 8px 10px; margin-bottom: 8px; }
-  .camera b { display: block; }
-  .camera small { color: var(--suave); }
-  .camera .grade { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-top: 6px; }
-  .camera .grade label { margin: 0; font-size: 10px; }
-  .camera .grade input { padding: 4px; font-size: 12px; }
-  .dica { color: var(--suave); font-size: 12px; margin: 4px 0; }
-  .direita { display: flex; flex-direction: column; min-width: 0; }
-  .amostras { display: flex; gap: 6px; padding: 10px; overflow-x: auto; border-bottom: 1px solid var(--borda);
-              min-height: 92px; }
-  .amostras img { height: 72px; border-radius: 4px; cursor: pointer; opacity: .6; border: 2px solid transparent; }
-  .amostras img.ativa { opacity: 1; border-color: var(--destaque); }
-  .palco { flex: 1; display: flex; align-items: center; justify-content: center; padding: 16px;
-           position: relative; min-height: 0; }
-  .comparar { position: relative; max-width: 100%; max-height: 100%; user-select: none; }
-  .comparar img { display: block; max-width: 100%; max-height: calc(100vh - 200px); }
-  .comparar .depois { position: absolute; inset: 0; overflow: hidden; }
-  .comparar .depois img { max-width: none; max-height: none; }
-  .comparar .alca { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff;
-                    cursor: ew-resize; box-shadow: 0 0 4px #000; }
-  .comparar .alca::after { content: "⟷"; position: absolute; top: 50%; left: 50%;
-                           transform: translate(-50%,-50%); background: #fff; color: #000;
-                           border-radius: 50%; width: 26px; height: 26px; display: grid;
-                           place-items: center; font-size: 14px; }
-  .rotulo { position: absolute; top: 8px; padding: 2px 8px; background: #000a; border-radius: 4px;
-            font-size: 12px; }
-  .vazio { color: var(--suave); text-align: center; max-width: 420px; }
-  .progresso { position: fixed; left: 0; right: 0; bottom: 0; background: var(--painel);
-               border-top: 1px solid var(--borda); padding: 12px 20px; display: none; }
-  .barra { height: 8px; background: var(--borda); border-radius: 4px; overflow: hidden; margin: 8px 0; }
-  .barra div { height: 100%; width: 0; background: var(--destaque); transition: width .3s; }
-  .erro { color: var(--erro); }
-  h3 { font-size: 12px; color: var(--suave); margin: 14px 0 6px; font-weight: 600; }
-  #curva { width: 100%; max-width: 348px; aspect-ratio: 1; background: var(--painel);
-           border: 1px solid var(--borda); border-radius: 6px; touch-action: none; cursor: crosshair; display: block; }
-  .canais { display: flex; gap: 4px; margin-bottom: 6px; }
-  .canais button { padding: 3px 10px; font-size: 12px; }
-  .canais button.ativo { border-color: var(--destaque); color: var(--destaque); }
-  .cores { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin-bottom: 6px; }
-  .cores button { height: 24px; padding: 0; border-radius: 50%; border: 2px solid transparent; }
-  .cores button.ativo { border-color: #fff; }
-  .nuvem-ok { color: var(--ok); }
-  .ok { color: var(--ok); }
-  @media (max-width: 800px) {
-    main { grid-template-columns: 1fr; height: auto; }
-    aside { border-right: 0; }
-  }
-</style>
+<title>EditaLote · Durães Fotografia</title>
+<link rel="icon" href="/estatico/marca/icone.png">
+<link rel="stylesheet" href="/estatico/estilo.css">
 </head>
 <body>
-<header><h1>EditaLote</h1><span>edição em lote para casamentos, aniversários e eventos</span></header>
-<main>
-  <aside>
-    <section>
-      <h2>1. Pastas</h2>
-      <label>Fotos originais (pode ter subpastas de cada fotógrafo)</label>
-      <div class="linha"><input type="text" id="entrada" placeholder="C:\Fotos\Casamento Ana e João">
-        <button onclick="escolher('entrada')">Procurar</button></div>
-      <label>Salvar as fotos editadas em</label>
-      <div class="linha"><input type="text" id="saida" placeholder="C:\Fotos\Casamento Ana e João - Editadas">
-        <button onclick="escolher('saida')">Procurar</button></div>
-      <div class="linha" style="margin-top:8px"><button onclick="escanear()">Carregar fotos</button>
-        <span id="resumo" class="dica"></span></div>
-    </section>
 
-    <section id="secCameras" style="display:none">
-      <h2>2. Câmeras encontradas</h2>
-      <p class="dica">Horário: se o relógio da câmera estava atrasado 5 minutos, coloque <b>+5:00</b>.
-        As fotos de todas as câmeras ficam na ordem certa do evento.
-        Os outros campos igualam a cor entre câmeras (ex.: Sony um pouco mais quente).</p>
-      <div id="cameras"></div>
-    </section>
+<header class="topo">
+  <div class="marca">
+    <img src="/estatico/marca/simbolo.png" alt="Durães Fotografia">
+    <div class="nome">Durães Fotografia<small>EDITALOTE · EDIÇÃO EM LOTE</small></div>
+  </div>
+  <nav class="passos" id="passos">
+    <div class="passo atual" data-passo="1"><b>1</b>Fotos</div>
+    <div class="passo" data-passo="2"><b>2</b>Estilo</div>
+    <div class="passo" data-passo="3"><b>3</b>Entregar</div>
+  </nav>
+  <button class="btn-principal" id="btnProcessar" onclick="processar()">Editar todas as fotos</button>
+</header>
 
-    <section>
-      <h2>3. Padrão de edição</h2>
-      <div class="linha"><select id="preset" onchange="usarPreset()"></select>
-        <button onclick="salvarPreset()" title="Salvar os ajustes atuais como um novo preset">Salvar</button></div>
-      <div class="linha" style="margin-top:6px; flex-wrap: wrap">
-        <button onclick="importarLR('arquivo')" title="Preset .xmp ou uma foto editada no Lightroom">Importar do Lightroom</button>
-        <button onclick="importarLR('pasta')" title="Lê as edições de todas as fotos de um evento já editado e tira o padrão médio">Aprender de um evento</button>
+<div class="app">
+  <!-- ====================================================== esquerda: fotos -->
+  <aside class="lateral esq">
+    <details class="bloco" open>
+      <summary><span class="num">1</span>Fotos do evento</summary>
+      <div class="corpo">
+        <label>Fotos originais (pode ter subpastas de cada fotógrafo)</label>
+        <div class="linha"><input type="text" id="entrada" placeholder="C:\Fotos\Casamento Ana e João">
+          <button onclick="escolher('entrada')">Procurar</button></div>
+        <label>Salvar as fotos editadas em</label>
+        <div class="linha"><input type="text" id="saida" placeholder="C:\Fotos\Casamento Ana e João - Editadas">
+          <button onclick="escolher('saida')">Procurar</button></div>
+        <div class="linha" style="margin-top:10px"><button class="contorno" onclick="escanear()">Carregar fotos</button>
+          <span id="resumo" class="dica"></span></div>
       </div>
-      <select id="presetsLR" style="margin-top:6px; display:none" onchange="importarPresetLR()"></select>
-      <p class="dica">Lightroom (nuvem): para <b>Aprender de um evento</b>, selecione as fotos editadas &gt;
-        Exportar &gt; tipo <b>Original + configurações</b> e escolha essa pasta exportada.</p>
-      <p id="lrMsg" class="dica"></p>
-      <div id="sliders"></div>
-      <h3>Cor (HSL)</h3>
-      <div class="cores" id="coresHSL"></div>
-      <div id="slidersHSL"></div>
-      <h3>Curvas</h3>
-      <div id="slidersCurva"></div>
-      <div class="canais" style="margin-top:8px">
-        <button data-canal="curva" class="ativo" onclick="escolherCanal(this)">RGB</button>
-        <button data-canal="curva_r" onclick="escolherCanal(this)" style="color:#e06c6c">R</button>
-        <button data-canal="curva_g" onclick="escolherCanal(this)" style="color:#6cc18a">G</button>
-        <button data-canal="curva_b" onclick="escolherCanal(this)" style="color:#6c9be0">B</button>
-        <button onclick="zerarCurva()" style="margin-left:auto">Zerar curva</button>
+    </details>
+
+    <details class="bloco" id="secCameras" style="display:none" open>
+      <summary><span class="num">2</span>Câmeras</summary>
+      <div class="corpo">
+        <p class="dica">Horário: se o relógio da câmera estava 5 minutos atrasado, coloque <b>+5:00</b>.
+          Os outros campos igualam a cor entre câmeras.</p>
+        <div id="cameras"></div>
       </div>
-      <canvas id="curva" width="512" height="512"></canvas>
-      <p class="dica">Clique para criar um ponto e arraste. Dois cliques num ponto apagam o ponto.</p>
-      <label>LUT criativa (.cube) — opcional</label>
-      <div class="linha"><input type="text" id="lut" placeholder="nenhuma" onchange="mudou()">
-        <button onclick="escolher('lut')">Procurar</button></div>
-    </section>
+    </details>
 
-    <section>
-      <h2>4. Exportação</h2>
-      <label class="check"><input type="checkbox" id="renomear" checked> Renomear em ordem de horário</label>
-      <label>Nome do evento (vira o nome dos arquivos)</label>
-      <input type="text" id="prefixo" value="Casamento" placeholder="Casamento_Ana_Joao">
-      <label>Qualidade do JPEG (95 = idêntica a olho nu; 100 = arquivo maior)</label>
-      <input type="number" id="qualidade" value="95" min="80" max="100">
-      <label class="check"><input type="checkbox" id="versao_web"> Gerar também versão leve (2048 px) para WhatsApp/Instagram</label>
-      <label class="check"><input type="checkbox" id="separar_desfocadas" checked> Separar fotos possivelmente desfocadas para revisão</label>
-    </section>
+    <details class="bloco" open>
+      <summary><span class="num">3</span>Exportação</summary>
+      <div class="corpo">
+        <label class="check"><input type="checkbox" id="renomear" checked> Renomear em ordem de horário</label>
+        <label>Nome do evento (vira o nome dos arquivos)</label>
+        <input type="text" id="prefixo" value="Casamento" placeholder="Casamento_Ana_Joao">
+        <label>Qualidade do JPEG (95 = idêntica a olho nu)</label>
+        <input type="number" id="qualidade" value="95" min="80" max="100">
+        <label class="check"><input type="checkbox" id="versao_web"> Versão leve (2048 px) para WhatsApp/Instagram</label>
+        <label class="check"><input type="checkbox" id="separar_desfocadas" checked> Separar fotos possivelmente desfocadas</label>
+      </div>
+    </details>
 
-    <section>
-      <h2>5. Entrega na nuvem</h2>
-      <p class="dica">Salva as fotos editadas na pasta do OneDrive, Google Drive ou Dropbox deste
-        computador. O programa da nuvem envia sozinho, e dá para compartilhar a pasta com o cliente.</p>
-      <div class="linha"><select id="nuvens"></select>
-        <button onclick="escolherNuvem()">Outra</button></div>
-      <button style="margin-top:6px" onclick="saidaNaNuvem()">Salvar as editadas na nuvem</button>
-      <p id="nuvemMsg" class="dica"></p>
-    </section>
-
-    <button class="principal" id="btnProcessar" onclick="processar()">Editar todas as fotos</button>
+    <details class="bloco">
+      <summary><span class="num">4</span>Entrega na nuvem</summary>
+      <div class="corpo">
+        <p class="dica">Salva as editadas na pasta do OneDrive, Google Drive ou Dropbox deste computador.
+          O programa da nuvem envia sozinho.</p>
+        <div class="linha"><select id="nuvens"></select>
+          <button onclick="escolherNuvem()">Outra</button></div>
+        <button style="margin-top:8px; width:100%" onclick="saidaNaNuvem()">Salvar as editadas na nuvem</button>
+        <p id="nuvemMsg" class="dica"></p>
+      </div>
+    </details>
     <p id="msg" class="dica"></p>
   </aside>
 
-  <div class="direita">
-    <div class="amostras" id="amostras"></div>
+  <!-- ====================================================== centro: foto -->
+  <main class="centro">
     <div class="palco" id="palco">
-      <div class="vazio">Escolha a pasta com as fotos e clique em <b>Carregar fotos</b>.<br><br>
-        Clique numa miniatura para ver o <b>antes e depois</b> e ajustar o padrão.
-        Nada é alterado nos arquivos originais.</div>
+      <div class="vazio">
+        <img src="/estatico/marca/logo.png" alt="">
+        <h2>Bem-vindo</h2>
+        Escolha a pasta com as fotos do evento e clique em <b>Carregar fotos</b>.
+        Depois clique numa miniatura para ver o <b>antes e depois</b>.<br>
+        Os arquivos originais nunca são alterados.
+        <div class="atalhos"><kbd>←</kbd> <kbd>→</kbd> trocar de foto &nbsp;·&nbsp; segure <kbd>Espaço</kbd> para ver o antes</div>
+      </div>
     </div>
-  </div>
-</main>
+    <div class="tira" id="amostras"><span class="info">As fotos do evento aparecem aqui</span></div>
+  </main>
+
+  <!-- ====================================================== direita: estilo -->
+  <aside class="lateral dir">
+    <section class="ia" id="cardIA">
+      <h3><span class="selo">IA</span> Estilo Durães</h3>
+      <p id="iaInfo">Ensine a IA com um casamento que vocês já editaram no Lightroom. Ela aprende
+        como vocês ajustam cada tipo de foto (igreja escura, festa, externa) e repete foto a foto.</p>
+      <div id="iaTreino">
+        <label>Nome do estilo</label>
+        <input type="text" id="iaNome" value="Estilo Durães">
+        <button class="destaque" id="btnTreinar" style="width:100%; margin-top:8px" onclick="treinarIA()">Aprender meu estilo</button>
+        <p class="dica" id="iaComo">No Lightroom: selecione as fotos editadas &gt; Exportar &gt; tipo
+          <b>Original + configurações</b>. Depois escolha essa pasta aqui.</p>
+      </div>
+      <div id="iaProgresso" style="display:none"><div class="barra"><div id="iaBarra"></div></div>
+        <p class="dica" id="iaStatus"></p></div>
+      <div id="iaForca" style="display:none">
+        <div class="slider" title="0 = mesmo ajuste para todas; 100 = ajuste de cada foto como vocês fariam">
+          <span>Ajuste por foto</span>
+          <input type="range" id="s_ia_forca" min="0" max="100" step="1"
+            oninput="ajustes.ia_forca=+this.value; $('o_ia_forca').value=this.value; mudou()">
+          <output id="o_ia_forca"></output></div>
+        <p class="precisao" id="iaPrecisao"></p>
+      </div>
+    </section>
+
+    <div class="linha"><select id="preset" onchange="usarPreset()"></select>
+      <button onclick="salvarPreset()" title="Salvar os ajustes atuais como um novo preset">Salvar</button></div>
+    <div class="linha" style="margin-top:6px">
+      <select id="presetsLR" style="display:none" onchange="importarPresetLR()"></select>
+      <button class="fantasma" onclick="importarLR()" title="Preset .xmp ou uma foto editada no Lightroom">Importar do Lightroom</button>
+    </div>
+    <p id="lrMsg" class="dica"></p>
+
+    <div class="abas" id="abas">
+      <button class="ativa" data-aba="basico" onclick="abrirAba(this)">Básico</button>
+      <button data-aba="cor" onclick="abrirAba(this)">Cor</button>
+      <button data-aba="curvas" onclick="abrirAba(this)">Curvas</button>
+      <button data-aba="detalhes" onclick="abrirAba(this)">Detalhes</button>
+    </div>
+
+    <div class="aba ativa" data-aba="basico">
+      <h4>Automático</h4><div id="slidersAuto"></div>
+      <h4>Luz</h4><div id="slidersLuz"></div>
+      <h4>Cor</h4><div id="slidersCor"></div>
+    </div>
+    <div class="aba" data-aba="cor">
+      <h4>HSL · cor por cor</h4>
+      <div class="cores" id="coresHSL"></div>
+      <div id="slidersHSL"></div>
+      <p class="dica">Pele = laranja · grama = verde/amarelo · céu = azul.</p>
+    </div>
+    <div class="aba" data-aba="curvas">
+      <h4>Curva por regiões</h4><div id="slidersCurva"></div>
+      <h4>Curva de pontos</h4>
+      <div class="canais">
+        <button data-canal="curva" class="ativo" onclick="escolherCanal(this)">RGB</button>
+        <button data-canal="curva_r" onclick="escolherCanal(this)" style="color:#ff7b6b">R</button>
+        <button data-canal="curva_g" onclick="escolherCanal(this)" style="color:#6fd49a">G</button>
+        <button data-canal="curva_b" onclick="escolherCanal(this)" style="color:#7aa8ff">B</button>
+        <button class="fantasma" onclick="zerarCurva()" style="margin-left:auto">Zerar</button>
+      </div>
+      <canvas id="curva" width="512" height="512"></canvas>
+      <p class="dica">Clique para criar um ponto e arraste. Dois cliques num ponto apagam.</p>
+    </div>
+    <div class="aba" data-aba="detalhes">
+      <h4>Presença</h4><div id="slidersDetalhe"></div>
+      <h4>LUT criativa (.cube)</h4>
+      <div class="linha"><input type="text" id="lut" placeholder="nenhuma" onchange="mudou()">
+        <button onclick="escolher('lut')">Procurar</button></div>
+      <div id="slidersLut"></div>
+    </div>
+  </aside>
+</div>
 
 <div class="progresso" id="progresso">
   <div class="linha" style="justify-content:space-between">
-    <b id="progTexto">Processando…</b>
+    <span class="titulo" id="progTexto">Processando…</span>
     <span class="linha">
-      <button id="btnAbrir" style="display:none" onclick="abrirSaida()">Abrir pasta</button>
+      <button id="btnAbrir" class="destaque" style="display:none" onclick="abrirSaida()">Abrir pasta</button>
       <button id="btnCancelar" onclick="cancelar()">Cancelar</button>
       <button id="btnFechar" style="display:none" onclick="fecharProgresso()">Fechar</button>
     </span>
@@ -192,442 +176,8 @@
   <div class="barra"><div id="progBarra"></div></div>
   <div id="progDetalhe" class="dica"></div>
 </div>
+<div class="aviso" id="aviso"></div>
 
-<script>
-const CONTROLES = [
-  ["auto_exposicao", "Auto exposição", 0, 1, 0.05, "Iguala o brilho entre as fotos (0 = desligado)"],
-  ["auto_balanco_branco", "Auto balanço", 0, 1, 0.05, "Neutraliza dominantes de cor (0 = desligado)"],
-  ["exposicao", "Exposição", -2, 2, 0.05],
-  ["contraste", "Contraste", -100, 100, 1],
-  ["realces", "Realces", -100, 100, 1],
-  ["sombras", "Sombras", -100, 100, 1],
-  ["brancos", "Brancos", -100, 100, 1],
-  ["pretos", "Pretos", -100, 100, 1],
-  ["temperatura", "Temperatura", -100, 100, 1],
-  ["matiz", "Matiz", -100, 100, 1],
-  ["saturacao", "Saturação", -100, 100, 1],
-  ["vibracao", "Vibração", -100, 100, 1],
-  ["claridade", "Claridade", -100, 100, 1, "Contraste de áreas médias (dá 'destaque')"],
-  ["textura", "Textura", -100, 100, 1, "Detalhes finos; negativo suaviza a pele"],
-  ["nitidez", "Nitidez", 0, 100, 1],
-  ["lut_intensidade", "Força da LUT", 0, 100, 1],
-];
-const CONTROLES_CURVA = [
-  ["curva_realces", "Realces", -100, 100, 1],
-  ["curva_claros", "Claros", -100, 100, 1],
-  ["curva_escuros", "Escuros", -100, 100, 1],
-  ["curva_sombras", "Sombras", -100, 100, 1],
-];
-const CORES_HSL = [["vermelho", "#e0473c"], ["laranja", "#f08a24"], ["amarelo", "#f0d024"], ["verde", "#4cb04a"],
-  ["aqua", "#2fc4c4"], ["azul", "#3a6ee0"], ["roxo", "#8a4ce0"], ["magenta", "#d94cc4"]];
-const CONTROLES_HSL = CORES_HSL.flatMap(([cor]) => [
-  [`hsl_matiz_${cor}`, "Matiz", -100, 100, 1], [`hsl_sat_${cor}`, "Saturação", -100, 100, 1],
-  [`hsl_lum_${cor}`, "Luminância", -100, 100, 1]]);
-const TODOS_CONTROLES = [...CONTROLES, ...CONTROLES_CURVA, ...CONTROLES_HSL];
-let padroes = {};
-let ajustes = {}, presets = [], cameras = [], fotoAtual = null, timer = null, poll = null;
-const $ = id => document.getElementById(id);
-const esc = t => String(t ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
-
-function montarSliders() {
-  $("sliders").innerHTML = htmlSliders(CONTROLES);
-  $("slidersCurva").innerHTML = htmlSliders(CONTROLES_CURVA);
-  $("coresHSL").innerHTML = CORES_HSL.map(([cor, hex], i) =>
-    `<button style="background:${hex}" title="${cor}" data-cor="${cor}" onclick="escolherCor('${cor}')"></button>`).join("");
-  $("slidersHSL").innerHTML = CORES_HSL.map(([cor]) =>
-    `<div data-grupo="${cor}" style="display:none">${htmlSliders(CONTROLES_HSL.filter(c => c[0].endsWith("_" + cor)))}</div>`).join("");
-  escolherCor("laranja");
-}
-function escolherCor(cor) {
-  document.querySelectorAll("#coresHSL button").forEach(b => b.classList.toggle("ativo", b.dataset.cor === cor));
-  document.querySelectorAll("#slidersHSL [data-grupo]").forEach(d => d.style.display = d.dataset.grupo === cor ? "" : "none");
-}
-function htmlSliders(lista) {
-  return lista.map(([k, nome, min, max, passo, dica]) => `
-    <div class="slider" title="${dica || ""}"><span>${nome}</span>
-      <input type="range" id="s_${k}" min="${min}" max="${max}" step="${passo}"
-        oninput="ajustes['${k}']=+this.value; $('o_${k}').value=this.value; mudou()"
-        ondblclick="resetar('${k}')">
-      <output id="o_${k}"></output></div>`).join("");
-}
-function mostrarAjustes() {
-  for (const [k] of TODOS_CONTROLES) {
-    const v = ajustes[k] ?? 0;
-    $("s_" + k).value = v; $("o_" + k).value = v;
-  }
-  $("lut").value = ajustes.lut || "";
-  desenharCurva();
-}
-function resetar(k) { ajustes[k] = (k === "lut_intensidade") ? 100 : 0; mostrarAjustes(); mudou(); }
-
-async function api(url, corpo) {
-  const r = await fetch(url, corpo === undefined ? {} : {
-    method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(corpo)});
-  const dados = await r.json();
-  if (!r.ok) throw new Error(dados.erro || "Erro");
-  return dados;
-}
-
-async function carregarPresets(selecionar) {
-  presets = await api("/api/presets");
-  $("preset").innerHTML = presets.map((p, i) => `<option value="${i}">${esc(p.nome)}</option>`).join("");
-  const i = selecionar ? presets.findIndex(p => p.arquivo === selecionar) : 0;
-  $("preset").value = Math.max(0, i);
-  usarPreset();
-}
-function usarPreset() {
-  const p = presets[$("preset").value] || {};
-  const cams = ajustes.cameras || {};
-  ajustes = {...structuredClone(padroes), ...structuredClone(p), cameras: cams};
-  delete ajustes.arquivo;
-  mostrarAjustes(); mudou();
-}
-async function salvarPreset() {
-  const nome = prompt("Nome do preset:", presets[$("preset").value]?.nome || "Meu padrão");
-  if (!nome) return;
-  const r = await api("/api/presets", {...ajustes, nome});
-  await carregarPresets(r.arquivo);
-}
-
-async function importarLR(tipo) {
-  const r = await api("/api/escolher", {tipo: tipo === "pasta" ? "pasta" : "lightroom"});
-  if (r.erro) alert(r.erro);
-  if (r.caminho) await importarCaminhoLR(r.caminho, tipo);
-}
-async function importarPresetLR() {
-  const caminho = $("presetsLR").value;
-  if (caminho) await importarCaminhoLR(caminho, "arquivo");
-  $("presetsLR").value = "";
-}
-async function carregarPresetsLR() {
-  try {
-    const lista = await api("/api/lightroom/presets");
-    if (!lista.length) return;
-    let grupo = null, html = `<option value="">Presets do Lightroom neste computador (${lista.length})…</option>`;
-    for (const p of lista) {
-      if (p.grupo !== grupo) { if (grupo !== null) html += "</optgroup>"; grupo = p.grupo; html += `<optgroup label="${esc(grupo)}">`; }
-      html += `<option value="${esc(p.caminho)}">${esc(p.nome)}</option>`;
-    }
-    $("presetsLR").innerHTML = html + "</optgroup>";
-    $("presetsLR").style.display = "";
-  } catch (e) { /* sem presets do Lightroom: tudo bem */ }
-}
-async function importarCaminhoLR(caminho, tipo) {
-  $("lrMsg").textContent = "Lendo as edições do Lightroom…";
-  try {
-    const res = await api("/api/lightroom", {caminho});
-    const cams = ajustes.cameras || {};
-    ajustes = {...structuredClone(padroes), ...res.ajustes, cameras: cams,
-               nome: tipo === "pasta" ? "Padrão aprendido do Lightroom" : "Importado do Lightroom"};
-    mostrarAjustes(); mudou();
-    let txt = res.fotos > 1 ? `Padrão tirado de ${res.fotos} fotos editadas.` : "Ajustes importados.";
-    if (res.ignorados.length) txt += ` Ainda não suportado (ignorado): ${res.ignorados.join(", ")}.`;
-    txt += " Clique em Salvar para guardar como preset.";
-    $("lrMsg").textContent = txt;
-  } catch (e) { $("lrMsg").innerHTML = `<span class="erro">${esc(e.message)}</span>`; }
-}
-
-// ---------------------------------------------------------------- curva
-let canalCurva = "curva", arrastoCurva = -1;
-const CORES_CANAL = {curva: "#e7e7e9", curva_r: "#e06c6c", curva_g: "#6cc18a", curva_b: "#6c9be0"};
-function pontosDe(canal) { return ajustes[canal] ? ajustes[canal].map(p => [...p]) : [[0, 0], [255, 255]]; }
-function pchip(pontos, x) {
-  const xs = pontos.map(p => p[0]), ys = pontos.map(p => p[1]), n = xs.length;
-  const h = [], d = [];
-  for (let k = 0; k < n - 1; k++) { h.push(xs[k + 1] - xs[k]); d.push((ys[k + 1] - ys[k]) / h[k]); }
-  const m = [d[0]];
-  for (let k = 1; k < n - 1; k++) {
-    if (d[k - 1] * d[k] <= 0) m.push(0);
-    else { const w1 = 2 * h[k] + h[k - 1], w2 = h[k] + 2 * h[k - 1]; m.push((w1 + w2) / (w1 / d[k - 1] + w2 / d[k])); }
-  }
-  m.push(d[n - 2]);
-  x = Math.min(Math.max(x, xs[0]), xs[n - 1]);
-  let i = 0; while (i < n - 2 && x >= xs[i + 1]) i++;
-  const t = (x - xs[i]) / h[i], t2 = t * t, t3 = t2 * t;
-  const y = (2*t3 - 3*t2 + 1) * ys[i] + (t3 - 2*t2 + t) * h[i] * m[i] + (-2*t3 + 3*t2) * ys[i + 1] + (t3 - t2) * h[i] * m[i + 1];
-  return Math.min(255, Math.max(0, y));
-}
-function desenharCurva() {
-  const c = $("curva"), g = c.getContext("2d"), W = c.width, E = W / 255;
-  g.clearRect(0, 0, W, W);
-  g.strokeStyle = "#2c2f33"; g.lineWidth = 1;
-  for (let i = 1; i < 4; i++) { const p = i * W / 4; g.beginPath(); g.moveTo(p, 0); g.lineTo(p, W); g.moveTo(0, p); g.lineTo(W, p); g.stroke(); }
-  g.setLineDash([4, 4]); g.beginPath(); g.moveTo(0, W); g.lineTo(W, 0); g.stroke(); g.setLineDash([]);
-  for (const canal of ["curva", "curva_r", "curva_g", "curva_b"]) {
-    if (canal !== canalCurva && !ajustes[canal]) continue;
-    const pts = pontosDe(canal);
-    g.strokeStyle = CORES_CANAL[canal]; g.globalAlpha = canal === canalCurva ? 1 : 0.35; g.lineWidth = 3;
-    g.beginPath();
-    for (let x = 0; x <= 255; x++) { const y = pchip(pts, x); x ? g.lineTo(x * E, W - y * E) : g.moveTo(0, W - y * E); }
-    g.stroke();
-  }
-  g.globalAlpha = 1;
-  g.fillStyle = CORES_CANAL[canalCurva];
-  for (const [x, y] of pontosDe(canalCurva)) { g.beginPath(); g.arc(x * E, W - y * E, 8, 0, 7); g.fill(); }
-}
-function posCurva(e) {
-  const r = $("curva").getBoundingClientRect();
-  return [Math.round(Math.min(255, Math.max(0, (e.clientX - r.left) / r.width * 255))),
-          Math.round(Math.min(255, Math.max(0, 255 - (e.clientY - r.top) / r.height * 255)))];
-}
-function salvarPontos(pts) {
-  const identidade = pts.length === 2 && pts[0][0] === 0 && pts[0][1] === 0 && pts[1][0] === 255 && pts[1][1] === 255;
-  ajustes[canalCurva] = identidade ? null : pts;
-  desenharCurva(); mudou();
-}
-function pontoProximo(pts, [x, y]) {
-  let melhor = -1, dist = 12;
-  pts.forEach(([px, py], i) => { const d = Math.hypot(px - x, py - y); if (d < dist) { dist = d; melhor = i; } });
-  return melhor;
-}
-function ligarCurva() {
-  const c = $("curva");
-  c.addEventListener("pointerdown", e => {
-    c.setPointerCapture(e.pointerId);
-    const p = posCurva(e), pts = pontosDe(canalCurva);
-    let i = pontoProximo(pts, p);
-    if (i < 0) {
-      if (p[0] <= pts[0][0] || p[0] >= pts[pts.length - 1][0]) return;
-      pts.push(p); pts.sort((a, b) => a[0] - b[0]); i = pts.findIndex(q => q === p);
-      salvarPontos(pts);
-    }
-    arrastoCurva = i;
-  });
-  c.addEventListener("pointermove", e => {
-    if (arrastoCurva < 0) return;
-    const pts = pontosDe(canalCurva), i = arrastoCurva, [x, y] = posCurva(e);
-    const min = i === 0 ? 0 : pts[i - 1][0] + 1, max = i === pts.length - 1 ? 255 : pts[i + 1][0] - 1;
-    pts[i] = [Math.min(max, Math.max(min, x)), y];
-    salvarPontos(pts);
-  });
-  c.addEventListener("pointerup", () => arrastoCurva = -1);
-  c.addEventListener("dblclick", e => {
-    const pts = pontosDe(canalCurva), i = pontoProximo(pts, posCurva(e));
-    if (i > 0 && i < pts.length - 1) { pts.splice(i, 1); salvarPontos(pts); }
-  });
-}
-function escolherCanal(btn) {
-  document.querySelectorAll(".canais button[data-canal]").forEach(b => b.classList.toggle("ativo", b === btn));
-  canalCurva = btn.dataset.canal; desenharCurva();
-}
-function zerarCurva() { ajustes[canalCurva] = null; desenharCurva(); mudou(); }
-
-async function escolher(campo) {
-  const r = await api("/api/escolher", {tipo: campo === "lut" ? "lut" : "pasta"});
-  if (r.erro) alert(r.erro);
-  if (!r.caminho) return;
-  $(campo).value = r.caminho;
-  if (campo === "entrada" && !$("saida").value) $("saida").value = r.caminho + " - Editadas";
-  if (campo === "entrada") escanear();
-  if (campo === "lut") { ajustes.lut = r.caminho; mudou(); }
-}
-
-async function escanear() {
-  const pasta = $("entrada").value.trim();
-  if (!pasta) return;
-  $("resumo").textContent = "Lendo…";
-  try {
-    const r = await api("/api/escanear", {pasta, saida: $("saida").value.trim()});
-    $("resumo").textContent = `${r.total} fotos`;
-    cameras = r.cameras;
-    montarCameras();
-    $("amostras").innerHTML = r.amostras.map((a, i) =>
-      `<img src="/api/miniatura?caminho=${encodeURIComponent(a.caminho)}&lado=200"
-        title="${esc(a.nome)} — ${esc(a.camera)}" data-caminho="${encodeURIComponent(a.caminho)}"
-        onclick="selecionar(this)">`).join("");
-    const primeira = $("amostras").querySelector("img");
-    if (primeira) selecionar(primeira);
-  } catch (e) { $("resumo").innerHTML = `<span class="erro">${esc(e.message)}</span>`; }
-}
-
-function montarCameras() {
-  $("secCameras").style.display = cameras.length ? "" : "none";
-  ajustes.cameras = ajustes.cameras || {};
-  $("cameras").innerHTML = cameras.map((c, i) => {
-    const a = ajustes.cameras[c.id] || {};
-    const campo = (k, rotulo) => `<div><label>${rotulo}</label><input type="number" step="${k === "exposicao" ? 0.05 : 1}"
-      value="${a[k] || 0}" onchange="ajusteCamera(${i}, '${k}', +this.value)"></div>`;
-    return `<div class="camera"><b>${esc(c.nome)}</b>
-      <small>${c.fotos} fotos${c.inicio ? ` · ${c.inicio} → ${c.fim}` : " · sem horário no EXIF"}</small>
-      <div class="grade">
-        <div><label>Horário</label><input type="text" placeholder="+0:00" id="hora_${i}"></div>
-        ${campo("exposicao", "Expos.")}${campo("temperatura", "Temp.")}${campo("matiz", "Matiz")}${campo("saturacao", "Satur.")}
-      </div></div>`;
-  }).join("");
-}
-function ajusteCamera(i, k, v) {
-  const id = cameras[i].id;
-  ajustes.cameras[id] = {...(ajustes.cameras[id] || {}), [k]: v};
-  mudou();
-}
-function lerHorario(texto) {
-  texto = (texto || "").trim();
-  if (!texto) return 0;
-  const sinal = texto.startsWith("-") ? -1 : 1;
-  const partes = texto.replace(/^[+-]/, "").split(":").map(Number);
-  if (partes.some(isNaN)) throw new Error(`Horário inválido: "${texto}". Use o formato +5:00 ou -1:02:30`);
-  let seg = 0;
-  if (partes.length === 1) seg = partes[0] * 60;       // só minutos
-  else if (partes.length === 2) seg = partes[0] * 60 + partes[1];
-  else seg = partes[0] * 3600 + partes[1] * 60 + partes[2];
-  return sinal * seg;
-}
-
-function selecionar(img) {
-  document.querySelectorAll(".amostras img").forEach(x => x.classList.remove("ativa"));
-  img.classList.add("ativa");
-  fotoAtual = decodeURIComponent(img.dataset.caminho);
-  const antes = `/api/miniatura?caminho=${img.dataset.caminho}&lado=1400`;
-  $("palco").innerHTML = `
-    <div class="comparar" id="comparar">
-      <img id="imgAntes" src="${antes}">
-      <div class="depois" id="depois"><img id="imgDepois"></div>
-      <div class="alca" id="alca"></div>
-      <span class="rotulo" style="left:8px">Antes</span>
-      <span class="rotulo" style="right:8px">Depois</span>
-    </div>`;
-  $("imgAntes").onload = () => { posicionar(0.5); };
-  ligarArraste();
-  atualizarPrevia();
-}
-function posicionar(f) {
-  const c = $("comparar"), antes = $("imgAntes");
-  if (!c || !antes) return;
-  const w = antes.clientWidth, h = antes.clientHeight;
-  const x = Math.max(0, Math.min(1, f)) * w;
-  $("depois").style.left = x + "px";
-  $("depois").style.width = (w - x) + "px";
-  const d = $("imgDepois");
-  d.style.width = w + "px"; d.style.height = h + "px"; d.style.marginLeft = -x + "px";
-  $("alca").style.left = x + "px";
-  c.dataset.f = f;
-}
-function ligarArraste() {
-  const c = $("comparar");
-  const mover = e => {
-    const r = c.getBoundingClientRect();
-    const x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
-    posicionar(x / r.width);
-  };
-  let arrastando = false;
-  c.addEventListener("pointerdown", e => { arrastando = true; mover(e); });
-  window.addEventListener("pointermove", e => arrastando && mover(e));
-  window.addEventListener("pointerup", () => arrastando = false);
-  window.addEventListener("resize", () => posicionar(+c.dataset.f || 0.5));
-}
-function mudou() {
-  clearTimeout(timer);
-  timer = setTimeout(atualizarPrevia, 250);
-}
-async function atualizarPrevia() {
-  ajustes.lut = $("lut").value.trim() || null;
-  if (!fotoAtual) return;
-  const alvo = fotoAtual;
-  const r = await fetch("/api/previa", {method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({caminho: alvo, ajustes, lado: 1400})});
-  if (!r.ok) { $("msg").innerHTML = `<span class="erro">${esc((await r.json()).erro)}</span>`; return; }
-  $("msg").textContent = "";
-  const url = URL.createObjectURL(await r.blob());
-  if (alvo !== fotoAtual || !$("imgDepois")) return;
-  const d = $("imgDepois");
-  const velho = d.src;
-  d.onload = () => { if (velho) URL.revokeObjectURL(velho); posicionar(+$("comparar").dataset.f || 0.5); };
-  d.src = url;
-}
-
-async function processar() {
-  let ajusteHorario = {};
-  try {
-    cameras.forEach((c, i) => { const s = lerHorario($("hora_" + i)?.value); if (s) ajusteHorario[c.id] = s; });
-  } catch (e) { alert(e.message); return; }
-  const corpo = {
-    entrada: $("entrada").value.trim(), saida: $("saida").value.trim(),
-    ajustes: {...ajustes, lut: $("lut").value.trim() || null},
-    opcoes: {
-      renomear: $("renomear").checked, prefixo: $("prefixo").value.trim(),
-      qualidade: +$("qualidade").value, versao_web: $("versao_web").checked,
-      separar_desfocadas: $("separar_desfocadas").checked, ajuste_horario: ajusteHorario,
-    },
-  };
-  try { await api("/api/processar", corpo); }
-  catch (e) { alert(e.message); return; }
-  $("btnProcessar").disabled = true;
-  $("progresso").style.display = "block";
-  $("btnCancelar").style.display = ""; $("btnFechar").style.display = "none"; $("btnAbrir").style.display = "none";
-  poll = setInterval(acompanhar, 700);
-}
-function tempo(s) {
-  if (s == null) return "…";
-  const m = Math.floor(s / 60);
-  return m ? `${m} min ${s % 60}s` : `${s}s`;
-}
-async function acompanhar() {
-  const s = await api("/api/status");
-  const pct = s.total ? (100 * s.feitas / s.total) : 0;
-  $("progBarra").style.width = pct + "%";
-  $("progTexto").textContent = `${s.mensagem} ${s.total ? `${s.feitas} de ${s.total}` : ""}`;
-  let det = `Tempo: ${tempo(s.decorrido)}`;
-  if (s.estado === "processando") det += ` · faltam ~${tempo(s.restante)}`;
-  if (s.qtd_erros) det += ` · <span class="erro">${s.qtd_erros} com erro</span>`;
-  if (s.estado === "concluido") {
-    det += ` · <span class="ok">pronto!</span>`;
-    if (s.desfocadas) det += ` · ${s.desfocadas} separadas em "_revisar_desfocadas"`;
-    det += ` · relatório em relatorio.csv`;
-  }
-  if (s.estado === "erro") det = `<span class="erro">${esc(s.mensagem)}</span>`;
-  if (s.erros?.length) det += "<br>" + s.erros.slice(-3).map(esc).join("<br>");
-  $("progDetalhe").innerHTML = det;
-  if (["concluido", "cancelado", "erro"].includes(s.estado)) {
-    clearInterval(poll);
-    $("btnProcessar").disabled = false;
-    $("btnCancelar").style.display = "none"; $("btnFechar").style.display = "";
-    if (s.estado === "concluido") $("btnAbrir").style.display = "";
-  }
-}
-async function cancelar() { await api("/api/cancelar", {}); }
-function fecharProgresso() { $("progresso").style.display = "none"; }
-async function abrirSaida() { await api("/api/abrir-pasta", {pasta: $("saida").value.trim()}); }
-
-// ---------------------------------------------------------------- nuvem
-const CHAVE_NUVEM = "editalote.nuvem";
-function lembrar(valor) { try { localStorage.setItem(CHAVE_NUVEM, valor); } catch (e) {} }
-function lembrada() { try { return localStorage.getItem(CHAVE_NUVEM) || ""; } catch (e) { return ""; } }
-function adicionarNuvem(caminho, texto) {
-  const op = document.createElement("option");
-  op.value = caminho; op.textContent = texto || caminho;
-  $("nuvens").prepend(op);
-}
-async function carregarNuvem() {
-  const pastas = await api("/api/nuvem");
-  $("nuvens").innerHTML = pastas.map(p => `<option value="${esc(p.caminho)}">${esc(p.nome)} — ${esc(p.caminho)}</option>`).join("");
-  const anterior = lembrada();
-  if (anterior && !pastas.some(p => p.caminho === anterior)) adicionarNuvem(anterior);
-  if (anterior) $("nuvens").value = anterior;
-  if (!$("nuvens").options.length)
-    $("nuvens").innerHTML = `<option value="">Nenhuma pasta de nuvem encontrada — use "Outra"</option>`;
-}
-async function escolherNuvem() {
-  const r = await api("/api/escolher", {tipo: "pasta"});
-  if (!r.caminho) return;
-  adicionarNuvem(r.caminho); $("nuvens").value = r.caminho; lembrar(r.caminho);
-}
-async function saidaNaNuvem() {
-  const nuvem = $("nuvens").value;
-  if (!nuvem) { alert("Escolha a pasta da nuvem (OneDrive, Google Drive…)"); return; }
-  lembrar(nuvem);
-  const entrada = $("entrada").value.trim().replace(/[\\/]+$/, "");
-  const evento = entrada ? entrada.split(/[\\/]/).pop() : $("prefixo").value;
-  const r = await api("/api/nuvem/entrega", {nuvem, evento});
-  $("saida").value = r.caminho;
-  $("nuvemMsg").textContent = "As editadas vão para: " + r.caminho + ".";
-  $("msg").textContent = "Atenção: 2.000 fotos ocupam uns 10–16 GB. Confira se o plano da nuvem tem espaço (o Google Drive grátis tem 15 GB).";
-}
-
-montarSliders();
-carregarNuvem();
-carregarPresetsLR();
-ligarCurva();
-api("/api/padroes").then(r => { padroes = r.ajustes; carregarPresets(); });
-</script>
+<script src="/estatico/app.js"></script>
 </body>
 </html>

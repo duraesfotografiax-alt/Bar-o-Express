@@ -9,12 +9,13 @@ import re
 import subprocess
 import sys
 import threading
+import unicodedata
 import webbrowser
 
 from flask import Flask, abort, jsonify, request, send_file, send_from_directory
 from PIL import Image
 
-from . import nuvem
+from . import estilo_ia, nuvem
 from .lightroom import aprender, presets_instalados
 from .lote import OPCOES_PADRAO, Trabalho, resumo_pasta
 from .metadados import EXTENSOES
@@ -40,9 +41,82 @@ def _jpeg_valido(caminho: str | None) -> str:
     return caminho
 
 
+def _nome_arquivo(nome: str, padrao: str) -> str:
+    """ "Estilo Durães" -> "estilo-duraes" (sem acento, seguro no Windows)."""
+    sem_acento = unicodedata.normalize("NFKD", nome).encode("ascii", "ignore").decode()
+    return re.sub(r"[^a-z0-9]+", "-", sem_acento.lower()).strip("-") or padrao
+
+
+def _resolver_estilo(ajustes: dict) -> dict:
+    """O preset guarda "estilos/nome.json"; o processamento precisa do caminho completo."""
+    estilo = ajustes.get("estilo_ia")
+    if estilo and not os.path.isabs(estilo):
+        ajustes = {**ajustes, "estilo_ia": os.path.join(PASTA_PRESETS, estilo)}
+    return ajustes
+
+
+class Treino:
+    """Treino da IA em segundo plano (pode levar alguns minutos com milhares de fotos)."""
+
+    def __init__(self, pasta: str, nome: str):
+        self.pasta, self.nome = pasta, nome
+        self.estado, self.feitas, self.total = "lendo", 0, 0
+        self.resultado: dict | None = None
+        self.erro = ""
+
+    def progresso(self, feitas: int, total: int):
+        self.estado, self.feitas, self.total = "treinando", feitas, total
+
+    def executar(self):
+        try:
+            modelo = estilo_ia.treinar(self.pasta, self.nome, progresso=self.progresso)
+            arquivo = _nome_arquivo(self.nome, "estilo")
+            estilo_ia.salvar(modelo, os.path.join(PASTA_PRESETS, "estilos", f"{arquivo}.json"))
+            preset = {**modelo["base"], "nome": self.nome, "estilo_ia": f"estilos/{arquivo}.json",
+                      "ia_forca": 100, "auto_exposicao": 0, "auto_balanco_branco": 0}
+            os.makedirs(PASTA_PRESETS, exist_ok=True)
+            with open(os.path.join(PASTA_PRESETS, f"{arquivo}.json"), "w", encoding="utf-8") as f:
+                json.dump(preset, f, ensure_ascii=False, indent=2)
+            self.resultado = {"arquivo": f"{arquivo}.json", "fotos": modelo["fotos"],
+                              "precisao": modelo["precisao"], "ignorados": modelo["ignorados"]}
+            self.estado = "concluido"
+        except Exception as erro:
+            self.estado, self.erro = "erro", str(erro)
+
+    def status(self) -> dict:
+        return {"estado": self.estado, "feitas": self.feitas, "total": self.total,
+                "resultado": self.resultado, "erro": self.erro}
+
+
+_treino: Treino | None = None
+
+
+@app.post("/api/estilo/treinar")
+def treinar_estilo():
+    global _treino
+    dados = request.json or {}
+    if not os.path.isdir(dados.get("pasta", "")):
+        return jsonify({"erro": "Pasta não encontrada"}), 400
+    if _treino and _treino.estado in ("lendo", "treinando"):
+        return jsonify({"erro": "Já tem um treino em andamento"}), 409
+    _treino = Treino(dados["pasta"], (dados.get("nome") or "Meu estilo").strip())
+    threading.Thread(target=_treino.executar, daemon=True).start()
+    return jsonify({"ok": True})
+
+
+@app.get("/api/estilo/status")
+def status_treino():
+    return jsonify(_treino.status() if _treino else {"estado": "parado"})
+
+
 @app.get("/")
 def inicio():
     return send_from_directory(PASTA_ESTATICA, "index.html")
+
+
+@app.get("/estatico/<path:arquivo>")
+def estatico(arquivo):
+    return send_from_directory(PASTA_ESTATICA, arquivo)
 
 
 @app.get("/api/padroes")
@@ -103,7 +177,8 @@ def escanear():
     pasta = dados.get("pasta", "")
     if not os.path.isdir(pasta):
         return jsonify({"erro": "Pasta não encontrada"}), 400
-    return jsonify(resumo_pasta(pasta, ignorar=dados.get("saida") or None))
+    amostras = max(1, min(int(dados.get("amostras") or 12), 60))
+    return jsonify(resumo_pasta(pasta, ignorar=dados.get("saida") or None, amostras=amostras))
 
 
 @app.get("/api/miniatura")
@@ -125,10 +200,13 @@ def previa():
     dados = request.json or {}
     caminho = _jpeg_valido(dados.get("caminho"))
     try:
-        conteudo = previa_jpeg(caminho, dados.get("ajustes") or {}, int(dados.get("lado", 1400)))
+        conteudo, ajuste_ia = previa_jpeg(caminho, _resolver_estilo(dados.get("ajustes") or {}),
+                                          int(dados.get("lado", 1400)))
     except Exception as erro:
         return jsonify({"erro": str(erro)}), 400
-    return send_file(io.BytesIO(conteudo), mimetype="image/jpeg")
+    resposta = send_file(io.BytesIO(conteudo), mimetype="image/jpeg")
+    resposta.headers["X-Ajuste-IA"] = json.dumps(ajuste_ia)
+    return resposta
 
 
 @app.get("/api/presets")
@@ -148,7 +226,7 @@ def salvar_preset():
     nome = (ajustes.get("nome") or "").strip()
     if not nome:
         return jsonify({"erro": "Dê um nome ao preset"}), 400
-    arquivo = re.sub(r"[^a-z0-9]+", "-", nome.lower()).strip("-") or "preset"
+    arquivo = _nome_arquivo(nome, "preset")
     os.makedirs(PASTA_PRESETS, exist_ok=True)
     caminho = os.path.join(PASTA_PRESETS, f"{arquivo}.json")
     with open(caminho, "w", encoding="utf-8") as f:
@@ -167,8 +245,8 @@ def processar():
             return jsonify({"erro": "Pasta das fotos não encontrada"}), 400
         if not dados.get("saida"):
             return jsonify({"erro": "Escolha a pasta de saída"}), 400
-        _trabalho = Trabalho(dados["entrada"], dados["saida"], dados.get("ajustes") or {},
-                             dados.get("opcoes") or {})
+        _trabalho = Trabalho(dados["entrada"], dados["saida"],
+                             _resolver_estilo(dados.get("ajustes") or {}), dados.get("opcoes") or {})
         threading.Thread(target=_trabalho.executar, daemon=True).start()
     return jsonify({"ok": True})
 

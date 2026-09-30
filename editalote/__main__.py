@@ -1,10 +1,12 @@
 """Uso:
-    python -m editalote                      -> abre a tela no navegador
+    python -m editalote                      -> abre o programa (janela própria)
+    python -m editalote tela                 -> abre a tela no navegador
     python -m editalote processar ENTRADA SAIDA [--preset arquivo.json] [--prefixo Nome]
 """
 
 import argparse
 import json
+import os
 import sys
 import threading
 import time
@@ -36,7 +38,9 @@ def escolher_com_janela(tipo: str) -> int:
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="editalote", description="Edição de fotos em lote")
     sub = parser.add_subparsers(dest="comando")
-    tela = sub.add_parser("tela", help="abre a interface no navegador (padrão)")
+    janela = sub.add_parser("janela", help="abre o programa em janela própria (padrão)")
+    janela.add_argument("--porta", type=int)
+    tela = sub.add_parser("tela", help="abre a interface no navegador")
     tela.add_argument("--porta", type=int, default=8765)
     tela.add_argument("--sem-navegador", action="store_true")
     proc = sub.add_parser("processar", help="processa uma pasta direto pelo terminal")
@@ -62,6 +66,9 @@ def main(argv=None):
         if args.preset:
             with open(args.preset, encoding="utf-8") as f:
                 ajustes = json.load(f)
+            estilo = ajustes.get("estilo_ia")
+            if estilo and not os.path.isabs(estilo):  # relativo à pasta do preset
+                ajustes["estilo_ia"] = os.path.join(os.path.dirname(os.path.abspath(args.preset)), estilo)
         opcoes = {"prefixo": args.prefixo, "qualidade": args.qualidade,
                   "renomear": not args.manter_nomes, "versao_web": args.web}
         trabalho = Trabalho(args.entrada, args.saida, ajustes, opcoes)
@@ -78,9 +85,15 @@ def main(argv=None):
             print("  -", erro)
         return 0 if s["estado"] == "concluido" else 1
 
+    if args.comando in (None, "janela"):
+        from .janela import abrir
+        from .servidor import RAIZ
+
+        return abrir(getattr(args, "porta", None), pasta_log=RAIZ)
+
     from .servidor import iniciar
 
-    porta = getattr(args, "porta", 8765)
+    porta = args.porta
     iniciar(porta, not getattr(args, "sem_navegador", False))
     return 0
 

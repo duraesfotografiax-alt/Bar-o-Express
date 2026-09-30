@@ -15,6 +15,7 @@ from datetime import timedelta
 
 from PIL import Image
 
+from .estilo_ia import ajustes_da_foto
 from .metadados import InfoFoto, ler_info, listar_jpegs
 from .processamento import (
     aplicar,
@@ -112,6 +113,7 @@ def _limpar_nome(texto: str) -> str:
 def processar_foto(origem: str, destino: str, ajustes: dict, opcoes: dict,
                    destino_web: str | None = None) -> dict:
     """Edita uma foto mantendo resolução, EXIF, perfil de cor e orientação."""
+    ajustes, ajuste_ia = ajustes_da_foto(ajustes, origem)
     analise = analisar(carregar_reduzida(origem))
     with Image.open(origem) as img:
         extras = {}
@@ -134,6 +136,7 @@ def processar_foto(origem: str, destino: str, ajustes: dict, opcoes: dict,
         editada.save(destino_web, "JPEG", quality=88, optimize=True, **extras)
 
     return {"ev_auto": round(analise.ev_auto, 2), "nitidez": round(analise.nitidez, 1),
+            "ia": ajuste_ia,
             "estourada": round(analise.estourada, 4)}
 
 
@@ -280,7 +283,7 @@ def _escrever_relatorio(saida, plano, resultados, suspeitas):
     with open(caminho, "w", newline="", encoding="utf-8-sig") as f:
         w = csv.writer(f, delimiter=";")
         w.writerow(["arquivo", "original", "camera", "horario", "exposicao_auto_ev",
-                    "nitidez", "situacao"])
+                    "nitidez", "ajuste_ia", "situacao"])
         for i, item in enumerate(plano):
             r = resultados.get(i, {})
             if not r.get("ok"):
@@ -293,5 +296,6 @@ def _escrever_relatorio(saida, plano, resultados, suspeitas):
                 item.nome_saida, item.info.caminho, item.info.nome_camera,
                 item.horario.strftime("%d/%m/%Y %H:%M:%S") if item.horario else "",
                 str(r.get("ev_auto", "")).replace(".", ","),
-                str(r.get("nitidez", "")).replace(".", ","), situacao,
+                str(r.get("nitidez", "")).replace(".", ","),
+                " ".join(f"{k}={v:+g}" for k, v in (r.get("ia") or {}).items()), situacao,
             ])

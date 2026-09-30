@@ -1,8 +1,9 @@
-# EditaLote
+# EditaLote · Durães Fotografia
 
-Edição de fotos **em lote** para casamentos, aniversários e eventos: 1.500, 2.000 ou 3.000 JPEGs
-editados com o **padrão do estúdio** em poucos minutos, **sem perder qualidade** e sem
-subir nada para a internet. Tudo roda no seu computador.
+Programa de PC para edição de fotos **em lote** em casamentos, aniversários e eventos. Ele edita
+1.500, 2.000 ou 3.000 JPEGs com o **estilo do estúdio** em poucos minutos, **sem perder qualidade**
+e sem subir nada para a internet. Tudo roda no seu computador. A **IA de estilo** aprende como vocês
+editam cada tipo de foto no Lightroom e repete isso foto a foto.
 
 ## O que ele faz
 
@@ -11,8 +12,9 @@ subir nada para a internet. Tudo roda no seu computador.
    câmeras do mesmo modelo, pelo número de série.
 3. **Acerta o horário de cada câmera** (ex.: "a Sony da equipe estava 7 minutos atrasada") e coloca
    todas as fotos **na ordem real do evento**.
-4. **Iguala exposição e balanço de branco** de foto para foto (auto exposição/auto balanço, com força
-   ajustável). Fotos que já estão boas ficam como estão.
+4. **IA de estilo**: aprende com um casamento que vocês já editaram e ajusta **cada foto** como vocês
+   ajustariam (exposição, temperatura, realces, sombras…). Sem a IA, o automático próprio iguala
+   exposição e balanço de branco entre as fotos.
 5. **Aplica o padrão do estúdio**: exposição, contraste, realces, sombras, brancos, pretos, temperatura,
    matiz, saturação, vibração, claridade, textura, nitidez, **HSL / Cor**, **curvas** e
    **LUT .cube** opcional.
@@ -24,6 +26,28 @@ subir nada para a internet. Tudo roda no seu computador.
    WhatsApp/Instagram (pasta `web`), e um `relatorio.csv` que abre no Excel.
 9. **Entrega na nuvem**: salva as fotos editadas direto numa pasta do OneDrive/Google Drive/Dropbox,
    pronta para compartilhar com o cliente.
+
+## IA de estilo (foto a foto)
+
+Um preset aplica o **mesmo** ajuste em todas as fotos. Por isso, depois de aplicar, uma foto fica
+clara e outra escura. A IA de estilo resolve isso: ela aprende **o que vocês fazem em cada tipo
+de foto** e repete.
+
+1. No Lightroom, selecione as fotos de um casamento que vocês **já editaram** > **Exportar** >
+   tipo **Original + configurações** > exporte para uma pasta.
+   (No Lightroom Classic: selecione as fotos e use **Metadados > Salvar metadados no arquivo**.)
+2. No EditaLote, no cartão **IA · Estilo Durães**, dê um nome e clique em **Aprender meu estilo**.
+   Escolha a pasta exportada. Com 1.500 fotos leva poucos minutos.
+3. Pronto: aparece o preset **✦ Estilo Durães**. Em cada foto, a tela mostra o que a IA fez
+   (ex.: "IA nesta foto: Exposição +0,35 · Temperatura −8").
+   - **Ajuste por foto** (0–100) controla o quanto a IA varia de uma foto para outra.
+   - Os controles do painel continuam valendo como o padrão do estilo. Mexer neles muda todas as fotos.
+   - O `relatorio.csv` lista o ajuste da IA em cada foto.
+
+Como funciona: para cada foto nova, a IA mede brilho, contraste, cor e ISO, procura as fotos do
+treino mais parecidas (os "vizinhos") e combina o que vocês fizeram nelas. Ao terminar o treino, ela
+mostra quanto erra na exposição comparado a um ajuste fixo. Quanto mais fotos e mais variados os
+eventos no treino, melhor ela fica. Dá para treinar de novo a qualquer momento.
 
 ## Vindo do Lightroom
 
@@ -38,12 +62,7 @@ Em vez de montar o padrão do zero, tragam o que vocês já fazem no Lightroom:
 - **Presets do Lightroom neste computador**: a tela lista sozinha os presets que o Lightroom
   (nuvem ou Classic) guardou no computador. É só escolher na lista.
 - **Importar do Lightroom**: escolha um preset `.xmp` ou uma foto com a edição gravada.
-- **Aprender de um evento**: escolha a pasta de um casamento que vocês já editaram foto por foto.
-  O EditaLote lê a edição de cada foto e usa a **mediana** (o "meio-termo") como padrão. Uma foto
-  muito diferente das outras não bagunça o resultado. Para gerar essa pasta:
-  - **Lightroom (o da nuvem)**: selecione as fotos editadas > **Exportar** > em tipo de arquivo
-    escolha **Original + configurações** > exporte para uma pasta e escolha essa pasta no EditaLote.
-  - **Lightroom Classic**: selecione as fotos e use **Metadados > Salvar metadados no arquivo** (Ctrl+S).
+- **Aprender meu estilo (IA)**: veja a seção acima.
 
 Depois de importar, confira no antes/depois e clique em **Salvar** para virar um preset.
 
@@ -52,7 +71,7 @@ cor, Vinheta, Granulação, Redução de ruído e máscaras/ajustes locais.
 
 ## Entrega na nuvem
 
-Na seção **5. Entrega na nuvem** da tela, escolha a pasta do OneDrive, Google Drive para
+No bloco **4. Entrega na nuvem** da tela, escolha a pasta do OneDrive, Google Drive para
 computador ou Dropbox (o EditaLote encontra sozinho; se não achar, use **Outra**) e clique em
 **Salvar as editadas na nuvem**. A pasta de saída passa a ser
 `…/EditaLote/Entregas/<nome do evento>`, e o programa da nuvem envia as fotos sozinho. Depois é só
@@ -79,21 +98,27 @@ compartilhar essa pasta com o cliente pelo próprio OneDrive/Google Drive.
 1. Baixe a versão mais recente (link fixo, sempre a última):
    <https://github.com/duraesfotografiax-alt/Bar-o-Express/releases/latest/download/EditaLote-Windows.zip>
 2. Extraia o .zip numa pasta (ex.: `C:\EditaLote`).
-3. Dê dois cliques em **`EditaLote.exe`**. Uma janela preta abre (deixe aberta) e o navegador abre
-   com a tela do programa.
+3. Dê dois cliques em **`EditaLote.exe`**. O programa abre na própria janela.
+   (Se o Windows não tiver o componente WebView2 da Microsoft, ele abre no navegador e mostra uma
+   janelinha para encerrar.)
    - Se o Windows mostrar "O Windows protegeu o computador", clique em **Mais informações >
      Executar assim mesmo** (o programa não tem assinatura digital paga).
    - Dica: botão direito no `EditaLote.exe` > **Enviar para > Área de trabalho (criar atalho)**.
+   - Se algo der errado, mande o arquivo **`editalote.log`** (fica ao lado do `EditaLote.exe`).
 
 ### Com Python instalado
 
 1. Instale o Python: <https://www.python.org/downloads/> e **marque "Add Python to PATH"**.
 2. Dê dois cliques em **`iniciar.bat`**. Na primeira vez ele instala o que precisa (1–2 minutos).
 
-### Usando a tela
+### Usando o programa
+
+A tela tem três colunas: **fotos e entrega** à esquerda, **antes e depois** no centro, com a tira
+de fotos embaixo, e o **estilo** à direita, com a IA e as abas Básico / Cor / Curvas / Detalhes.
 
 - **Procurar** a pasta das fotos, depois **Carregar fotos**;
-- Clique nas miniaturas e arraste a barra para comparar **antes × depois**;
+- Clique nas miniaturas (ou use **←** **→**) e arraste a barra para comparar **antes × depois**.
+  Segure **Espaço** para ver só o antes;
 - Escolha um preset (Natural, Casamento Quente, Claro e Leve, Marketing/Carros), importe do
   Lightroom, ou ajuste à mão; **Salvar** cria o seu próprio padrão (fica na pasta `presets`);
 - Se houver mais de uma câmera, acerte o **horário** e a cor de cada uma;
@@ -136,8 +161,10 @@ Estrutura:
 | `editalote/lightroom.py` | importa presets `.xmp` e edições salvas nas fotos |
 | `editalote/nuvem.py` | acha as pastas do OneDrive/Google Drive/Dropbox para a entrega |
 | `editalote/lote.py` | ordem por horário, renomeação, processamento paralelo, desfocadas, relatório |
-| `editalote/servidor.py` | servidor local (só `127.0.0.1`) |
-| `editalote/estatico/index.html` | tela |
+| `editalote/estilo_ia.py` | IA de estilo: treino e ajuste foto a foto (vizinhos mais próximos) |
+| `editalote/janela.py` | janela própria do programa (pywebview / WebView2) |
+| `editalote/servidor.py` | servidor local (só `127.0.0.1`) usado pela janela |
+| `editalote/estatico/` | tela (`index.html`, `estilo.css`, `app.js`), logo e fontes (Cinzel e Montserrat, licença OFL) |
 | `presets/*.json` | padrões de edição |
 
 ## Próximos passos sugeridos
