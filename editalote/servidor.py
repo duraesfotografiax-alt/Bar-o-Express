@@ -63,8 +63,8 @@ def _resolver_estilo(ajustes: dict) -> dict:
 class Treino:
     """Treino da IA em segundo plano (pode levar alguns minutos com milhares de fotos)."""
 
-    def __init__(self, pasta: str, nome: str, modo: str = "referencia"):
-        self.pasta, self.nome, self.modo = pasta, nome, modo
+    def __init__(self, pasta: str, nome: str, modo: str = "referencia", pasta_finais: str = ""):
+        self.pasta, self.nome, self.modo, self.pasta_finais = pasta, nome, modo, pasta_finais
         self.estado, self.feitas, self.total = "lendo", 0, 0
         self.resultado: dict | None = None
         self.erro = ""
@@ -76,7 +76,7 @@ class Treino:
         try:
             self.resultado = estilo_ia.treinar_e_salvar(
                 self.pasta, self.nome, PASTA_PRESETS, _nome_arquivo(self.nome, "estilo"), self.progresso,
-                modo=self.modo)
+                modo=self.modo, pasta_finais=self.pasta_finais)
             self.estado = "concluido"
         except ValueError as erro:  # explicação para o usuário (ex.: não achou edições)
             log.warning("treino: %s", erro)
@@ -101,8 +101,11 @@ def treinar_estilo():
         return jsonify({"erro": "Pasta não encontrada"}), 400
     if _treino and _treino.estado in ("lendo", "treinando"):
         return jsonify({"erro": "Já tem um treino em andamento"}), 409
-    modo = "lightroom" if dados.get("modo") == "lightroom" else "referencia"
-    _treino = Treino(dados["pasta"], (dados.get("nome") or "Meu estilo").strip(), modo)
+    modo = dados.get("modo") if dados.get("modo") in ("lightroom", "pares") else "referencia"
+    if modo == "pares" and not os.path.isdir(dados.get("pasta_finais", "")):
+        return jsonify({"erro": "Pasta das fotos finais não encontrada"}), 400
+    _treino = Treino(dados["pasta"], (dados.get("nome") or "Meu estilo").strip(), modo,
+                     dados.get("pasta_finais", ""))
     threading.Thread(target=_treino.executar, daemon=True).start()
     return jsonify({"ok": True})
 

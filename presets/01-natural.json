@@ -12,5 +12,6 @@
   "matiz": 0,
   "saturacao": 0,
   "vibracao": 10,
-  "nitidez": 10
+  "nitidez": 10,
+  "auto_tom": 100
 }

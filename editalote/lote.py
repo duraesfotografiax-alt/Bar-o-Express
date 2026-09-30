@@ -15,6 +15,7 @@ from datetime import timedelta
 
 from PIL import Image
 
+from .auto_tom import aplicar_auto
 from .estilo_ia import ajustes_da_foto
 from .metadados import InfoFoto, ler_info, listar_jpegs
 from .processamento import (
@@ -114,6 +115,8 @@ def processar_foto(origem: str, destino: str, ajustes: dict, opcoes: dict,
                    destino_web: str | None = None) -> dict:
     """Edita uma foto mantendo resolução, EXIF, perfil de cor e orientação."""
     ajustes, ajuste_ia = ajustes_da_foto(ajustes, origem)
+    ajustes, ajuste_auto = aplicar_auto(ajustes, origem)
+    ajuste_ia = {**ajuste_ia, **ajuste_auto}
     analise = analisar(carregar_reduzida(origem))
     with Image.open(origem) as img:
         extras = {}

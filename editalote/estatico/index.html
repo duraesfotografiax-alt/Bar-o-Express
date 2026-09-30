@@ -105,12 +105,18 @@
         <input type="text" id="iaNome" value="Estilo Durães">
         <label>Aprender com</label>
         <select id="iaModo" onchange="mostrarModoIA()">
-          <option value="referencia">Fotos finais já entregues (mais fácil)</option>
+          <option value="pares">Originais + fotos entregues (mais fiel, recomendado)</option>
+          <option value="referencia">Só as fotos finais entregues</option>
           <option value="lightroom">Originais + configurações do Lightroom</option>
         </select>
         <label id="iaPastaRotulo">Pasta com as fotos finais</label>
         <div class="linha"><input type="text" id="iaPasta" placeholder="C:\Fotos\Casamento exportado">
           <button onclick="escolherPastaIA()">Procurar</button></div>
+        <div id="iaFinaisBloco">
+          <label>Pasta das fotos finais (as mesmas, editadas e entregues)</label>
+          <div class="linha"><input type="text" id="iaPastaFinais" placeholder="C:\Fotos\Casamento - Entregues">
+            <button onclick="escolherPastaFinais()">Procurar</button></div>
+        </div>
         <button class="destaque" id="btnTreinar" style="width:100%; margin-top:8px" onclick="treinarIA()">Aprender meu estilo</button>
         <p class="dica" id="iaComo"></p>
       </div>
@@ -142,7 +148,11 @@
     </div>
 
     <div class="aba ativa" data-aba="basico">
-      <h4>Automático</h4><div id="slidersAuto"></div>
+      <div class="linha" style="justify-content:space-between; margin-top:16px">
+        <h4 style="margin:0">Automático</h4>
+        <button class="contorno" id="btnAuto" onclick="alternarAuto()" title="Como o Auto do Lightroom: acerta exposição, pretos, brancos, contraste e cor de cada foto">Auto</button>
+      </div>
+      <div id="slidersAuto"></div>
       <h4>Luz</h4><div id="slidersLuz"></div>
       <h4>Cor</h4><div id="slidersCor"></div>
     </div>

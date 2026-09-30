@@ -87,6 +87,19 @@ jobs:
           Get-Content saida-ref/relatorio.csv -TotalCount 3
           Remove-Item -Recurse dist/DuraesApp/presets/estilos, dist/DuraesApp/presets/referencia.json, dist/DuraesApp/duraesapp.log
 
+      - name: Testar a IA por pares dentro do .exe (originais + finais)
+        shell: pwsh
+        run: |
+          # "saida" foi renomeada (prefixo Teste): os pares são achados pela data/hora da foto
+          $p = Start-Process ./dist/DuraesApp/DuraesApp.exe -ArgumentList @("aprender", "amostra", "--finais", "saida", "--nome", "Pares", "--modo", "pares") -Wait -PassThru
+          Get-Content dist/DuraesApp/duraesapp.log -ErrorAction SilentlyContinue
+          if ($p.ExitCode -ne 0) { exit 1 }
+          $p = Start-Process ./dist/DuraesApp/DuraesApp.exe -ArgumentList @("processar", "amostra", "saida-pares", "--preset", "dist/DuraesApp/presets/pares.json") -Wait -PassThru
+          if ($p.ExitCode -ne 0) { exit 1 }
+          if ((Get-ChildItem saida-pares -Filter *.jpg).Count -ne 12) { exit 1 }
+          Get-Content saida-pares/relatorio.csv -TotalCount 3
+          Remove-Item -Recurse dist/DuraesApp/presets/estilos, dist/DuraesApp/presets/pares.json, dist/DuraesApp/duraesapp.log
+
       - name: Testar a janela do programa e a ligação com a tela
         shell: pwsh
         run: |

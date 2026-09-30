@@ -33,9 +33,21 @@ editam cada tipo de foto no Lightroom e repete isso foto a foto.
 
 Um preset aplica o **mesmo** ajuste em todas as fotos. Por isso, depois de aplicar, uma foto fica
 clara e outra escura. A IA de estilo resolve isso: ela ajusta **cada foto** até o jeito da Durães.
-Ela aprende de dois modos (campo **Aprender com** no cartão da IA):
+Ela aprende de três modos (campo **Aprender com** no cartão da IA):
 
-### 1. Fotos finais já entregues (mais fácil, recomendado)
+### 1. Originais + fotos entregues (mais fiel, recomendado)
+
+Escolha duas pastas de um casamento que vocês já entregaram: a das **fotos originais** (como
+saíram da câmera) e a das **mesmas fotos editadas e entregues**. A IA compara cada par e mede a
+curva exata de cada cor (R, G e B) que vocês aplicaram: contraste, pretos, brancos, exposição e cor
+de uma vez. Numa foto nova, ela usa a edição das fotos do treino mais parecidas (igreja escura com
+igreja escura, festa com festa). É o modo que mais evita a foto "esbranquiçada".
+
+- As fotos são juntadas pelo **nome do arquivo** (IMG_1234.jpg nas duas pastas). Se foram
+  renomeadas na exportação, são juntadas pela data/hora da foto (exporte com os metadados).
+- Ideal: 200 fotos ou mais, de todos os momentos. Funciona a partir de 5 pares.
+
+### 2. Só as fotos finais já entregues
 
 Escolha uma pasta com **30 a 100 fotos que vocês já entregaram**, de momentos diferentes (making
 of, cerimônia, externa, festa). Pode ser a pasta de entrega de um casamento. Não precisa do
@@ -52,12 +64,20 @@ festa à noite é comparada com fotos de festa, não com a externa ao meio-dia.
   e o contraste têm força total.
 - Quanto mais fotos e mais variadas, melhor ela acerta. Com poucas fotos, a cor pode sair diferente.
 
-### 2. Originais + configurações do Lightroom
+### 3. Originais + configurações do Lightroom
 
 No Lightroom, selecione as fotos de um casamento que vocês **já editaram** > **Exportar** > tipo
 **Original + configurações** > exporte para uma pasta. (No Lightroom Classic: selecione as fotos e
 use **Metadados > Salvar metadados no arquivo**.) A IA aprende os valores dos controles que vocês
 usaram em cada tipo de foto e repete.
+
+### Botão Auto (como o do Lightroom)
+
+Na aba **Básico**, o botão **Auto** acerta cada foto sozinha, sem treino: balanço de branco pelo
+que deveria ser branco, exposição sem estourar o vestido, pretos e brancos no lugar certo e uma
+curva em S suave. O controle **Força do Auto** (0 a 100) diz quanto aplicar. O preset **Natural**
+já vem com o Auto ligado. Quando um preset tem a IA de estilo, a IA faz esse papel (o Auto não soma
+por cima).
 
 ### Depois de treinar
 
@@ -223,6 +243,13 @@ coloque `+5:00` para essa câmera.
 ```bash
 python -m editalote processar "C:\Fotos\Casamento" "C:\Fotos\Casamento - Editadas" \
     --preset presets/02-casamento-quente.json --prefixo Casamento_Ana_Joao --web
+```
+
+Treinar a IA por pares pelo terminal:
+
+```bash
+python -m editalote aprender "C:\Fotos\Casamento - Originais" --modo pares \
+    --finais "C:\Fotos\Casamento - Entregues" --nome "Estilo Durães"
 ```
 
 ## Velocidade

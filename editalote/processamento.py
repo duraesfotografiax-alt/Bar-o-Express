@@ -24,6 +24,7 @@ PESOS_Y = np.array([0.2126, 0.7152, 0.0722], dtype=np.float64)
 
 AJUSTES_PADRAO: dict = {
     "nome": "Natural",
+    "auto_tom": 0,               # botão Auto (como o do Lightroom): 0 = desligado, 100 = força total
     "auto_exposicao": 0.7,       # 0 = desligado, 1 = corrige tudo
     "auto_balanco_branco": 0.4,  # 0 = desligado, 1 = neutro total
     "exposicao": 0.0,            # em EV (stops), -2..2
@@ -51,6 +52,10 @@ AJUSTES_PADRAO: dict = {
     "curva_b": None,
     # Curva calculada pela IA de referência para cada foto (não aparece na tela)
     "curva_ref": None,
+    # Curvas por canal calculadas pela IA de pares para cada foto (não aparecem na tela)
+    "curva_par_r": None,
+    "curva_par_g": None,
+    "curva_par_b": None,
     "lut": None,                 # caminho de arquivo .cube
     "lut_intensidade": 100,      # 0..100
     "estilo_ia": None,           # modelo da IA de estilo (presets/estilos/*.json)
@@ -69,7 +74,8 @@ for _cor, _ in CORES_HSL:
 CAMPOS_POR_CAMERA = ("exposicao", "temperatura", "matiz", "saturacao")
 
 
-CAMPOS_ANULAVEIS = ("lut", "curva", "curva_r", "curva_g", "curva_b", "curva_ref", "estilo_ia")
+CAMPOS_ANULAVEIS = ("lut", "curva", "curva_r", "curva_g", "curva_b", "curva_ref", "estilo_ia",
+                    "curva_par_r", "curva_par_g", "curva_par_b")
 
 
 def completar_ajustes(ajustes: dict | None) -> dict:
@@ -354,6 +360,10 @@ def transformar(rgb: np.ndarray, ajustes: dict, analise: Analise | None,
     # 3b) curvas: a da IA de referência, depois por regiões e a de pontos (ordem do Lightroom)
     if a.get("curva_ref"):
         v = avaliar_curva(a["curva_ref"], v)
+    for canal, chave in enumerate(("curva_par_r", "curva_par_g", "curva_par_b")):
+        if a.get(chave):
+            v = v.copy()
+            v[..., canal] = avaliar_curva(a[chave], v[..., canal])
     regioes = _curva_regioes(a)
     if regioes:
         v = avaliar_curva(regioes, v)
@@ -457,6 +467,10 @@ def previa_jpeg(caminho: str, ajustes: dict, lado: int = 1400) -> tuple[bytes, d
 
     ajustes = ajustes_para_camera(completar_ajustes(ajustes), ler_info(caminho).camera)
     ajustes, ajuste_ia = ajustes_da_foto(ajustes, caminho)
+    from .auto_tom import aplicar_auto
+
+    ajustes, ajuste_auto = aplicar_auto(ajustes, caminho)
+    ajuste_ia = {**ajuste_ia, **ajuste_auto}
     reduzida = carregar_reduzida(caminho)
     analise = analisar(reduzida)
     reduzida.thumbnail((lado, lado), Image.Resampling.LANCZOS)

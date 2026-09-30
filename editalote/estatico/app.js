@@ -2,8 +2,9 @@
 
 const GRUPOS = {
   slidersAuto: [
-    ["auto_exposicao", "Exposição", 0, 1, 0.05, "Iguala o brilho entre as fotos (0 = desligado). Com a IA de estilo ligada, a IA faz esse papel."],
-    ["auto_balanco_branco", "Balanço", 0, 1, 0.05, "Neutraliza dominantes de cor (0 = desligado)"],
+    ["auto_tom", "Força do Auto", 0, 100, 5, "Botão Auto (como o do Lightroom). 0 = desligado. Com a IA de estilo ligada, a IA faz esse papel."],
+    ["auto_exposicao", "Igualar brilho", 0, 1, 0.05, "Automático antigo: só iguala o brilho (0 = desligado)"],
+    ["auto_balanco_branco", "Igualar cor", 0, 1, 0.05, "Automático antigo: só neutraliza a cor (0 = desligado)"],
   ],
   slidersLuz: [
     ["exposicao", "Exposição", -2, 2, 0.05], ["contraste", "Contraste", -100, 100, 1],
@@ -112,6 +113,7 @@ function mostrarAjustes() {
     $("s_" + k).value = v; $("o_" + k).value = v;
   }
   $("s_ia_forca").value = ajustes.ia_forca ?? 100; $("o_ia_forca").value = ajustes.ia_forca ?? 100;
+  $("btnAuto").className = +(ajustes.auto_tom || 0) > 0 ? "destaque" : "contorno";
   $("lut").value = ajustes.lut || "";
   mostrarIA();
   desenharCurva();
@@ -144,6 +146,10 @@ async function salvarPreset() {
 
 // ------------------------------------------------------------------ IA de estilo
 const COMO_IA = {
+  pares: "O jeito mais fiel: escolha a pasta das fotos ORIGINAIS de um casamento (as que saíram da câmera) " +
+    "e a pasta das MESMAS fotos editadas e entregues. A IA compara cada par e aprende o contraste, a curva, " +
+    "a exposição e a cor exatos de vocês. Os nomes dos arquivos precisam ser iguais nas duas pastas " +
+    "(ou as finais precisam manter a data/hora da foto). Quanto mais pares, melhor (ideal: 200 ou mais).",
   referencia: "Escolha uma pasta com 30 a 100 fotos que vocês já entregaram, de momentos diferentes " +
     "(making of, cerimônia, externa, festa). Pode ser a pasta de entrega de um casamento. " +
     "Não precisa do Lightroom nem das fotos originais.",
@@ -154,7 +160,19 @@ function mostrarModoIA() {
   const modo = $("iaModo").value;
   $("iaComo").textContent = COMO_IA[modo];
   $("iaPastaRotulo").textContent = modo === "referencia" ? "Pasta com as fotos finais"
+    : modo === "pares" ? "Pasta das fotos originais (da câmera)"
     : "Pasta exportada do Lightroom (Original + configurações)";
+  $("iaFinaisBloco").style.display = modo === "pares" ? "" : "none";
+}
+async function escolherPastaFinais() {
+  const p = await dialogo("pasta");
+  if (p) $("iaPastaFinais").value = p;
+}
+function alternarAuto() {
+  ajustes.auto_tom = +(ajustes.auto_tom || 0) > 0 ? 0 : 100;
+  mostrarAjustes(); mudou();
+  aviso(ajustes.auto_tom ? (ajustes.estilo_ia ? "Auto ligado, mas a IA de estilo tem prioridade neste preset."
+    : "Auto ligado: cada foto é acertada sozinha.") : "Auto desligado.");
 }
 function mostrarIA() {
   const ativo = !!ajustes.estilo_ia;
@@ -177,9 +195,11 @@ function statusIA(texto, erro = false) {
 async function treinarIA() {
   let pasta = $("iaPasta").value.trim();
   if (!pasta) pasta = await escolherPastaIA();
-  if (!pasta) { statusIA("Escolha a pasta exportada do Lightroom (Original + configurações).", true); return; }
+  if (!pasta) { statusIA("Escolha a pasta das fotos.", true); return; }
+  const modo = $("iaModo").value, pastaFinais = $("iaPastaFinais").value.trim();
+  if (modo === "pares" && !pastaFinais) { statusIA("Escolha também a pasta das fotos finais (entregues).", true); return; }
   try { await api("/api/estilo/treinar", {pasta, nome: $("iaNome").value.trim() || "Estilo Durães",
-                                          modo: $("iaModo").value}); }
+                                          modo, pasta_finais: pastaFinais}); }
   catch (e) { statusIA(e.message, true); return; }
   $("iaTreino").style.display = "none"; $("iaProgresso").style.display = "";
   $("iaBarra").style.width = "0";
@@ -448,7 +468,8 @@ function textoIA(dif) {
     const sinal = v > 0 ? "+" : "−";
     return `${NOMES[k] || k} <b>${sinal}${num(Math.abs(v), k === "exposicao" ? 2 : 0)}</b>`;
   });
-  return partes.length ? "✦ IA nesta foto: " + partes.join(" · ") : "✦ IA: esta foto já está no padrão do estilo";
+  const quem = ajustes.estilo_ia ? "IA" : "Auto";
+  return partes.length ? `✦ ${quem} nesta foto: ` + partes.join(" · ") : `✦ ${quem}: esta foto já está no ponto`;
 }
 async function atualizarPrevia() {
   ajustes.lut = $("lut").value.trim() || null;
@@ -464,7 +485,7 @@ async function atualizarPrevia() {
   const url = URL.createObjectURL(await r.blob());
   if (alvo !== fotoAtual || !$("imgDepois")) return;
   const chip = $("chipIA");
-  chip.style.display = ajustes.estilo_ia && +(ajustes.ia_forca ?? 100) > 0 ? "block" : "none";
+  chip.style.display = (ajustes.estilo_ia && +(ajustes.ia_forca ?? 100) > 0) || +(ajustes.auto_tom || 0) > 0 ? "block" : "none";
   chip.innerHTML = textoIA(dif);
   const d = $("imgDepois"), velho = d.src;
   d.onload = () => { if (velho) URL.revokeObjectURL(velho); posicionar(+$("comparar").dataset.f || 0.5); };

@@ -245,12 +245,25 @@ def treinar(pasta: str, nome: str = "Meu estilo", limite: int = 2500,
 
 
 def treinar_e_salvar(pasta: str, nome: str, pasta_presets: str, arquivo: str,
-                     progresso=None, modo: str = "referencia") -> dict:
+                     progresso=None, modo: str = "referencia", pasta_finais: str = "") -> dict:
     """Treina e grava o modelo (presets/estilos/<arquivo>.json) e o preset que o usa.
 
     modo "referencia": aprende das fotos finais entregues (não precisa do Lightroom).
     modo "lightroom": aprende das originais + configurações do Lightroom.
     """
+    if modo == "pares":
+        from . import estilo_pares
+
+        modelo = estilo_pares.treinar(pasta, pasta_finais, nome, progresso=progresso)
+        estilo_pares.salvar(modelo, os.path.join(pasta_presets, "estilos", f"{arquivo}.json"))
+        preset = {"nome": nome, "estilo_ia": f"estilos/{arquivo}.json", "ia_forca": 100,
+                  "auto_exposicao": 0, "auto_balanco_branco": 0}
+        os.makedirs(pasta_presets, exist_ok=True)
+        with open(os.path.join(pasta_presets, f"{arquivo}.json"), "w", encoding="utf-8") as f:
+            json.dump(preset, f, ensure_ascii=False, indent=2)
+        log.info("estilo %r aprendido de %d pares", nome, modelo["fotos"])
+        return {"arquivo": f"{arquivo}.json", "fotos": modelo["fotos"], "modo": modo,
+                "diagnostico": modelo["diagnostico"], "precisao": {}, "ignorados": []}
     if modo == "referencia":
         from . import estilo_referencia
 
@@ -301,10 +314,13 @@ class Modelo:
 
 @lru_cache(maxsize=4)
 def _carregar(caminho: str, _mtime: float):
+    from .estilo_pares import TIPO as TIPO_PARES, ModeloPares
     from .estilo_referencia import TIPO, ModeloReferencia
 
     with open(caminho, encoding="utf-8") as f:
         dados = json.load(f)
+    if dados.get("tipo") == TIPO_PARES:
+        return ModeloPares(dados)
     return ModeloReferencia(dados) if dados.get("tipo") == TIPO else Modelo(dados)
 
 
@@ -324,9 +340,13 @@ def ajustes_da_foto(ajustes: dict, caminho_foto: str, reduzida: Image.Image | No
     if not caminho_modelo or forca <= 0 or not os.path.isfile(caminho_modelo):
         return ajustes, {}
     modelo = carregar(caminho_modelo)
-    if not isinstance(modelo, Modelo):  # IA por referência (aprendeu das fotos finais)
-        from .estilo_referencia import rgb_da_foto
+    from .estilo_pares import ModeloPares
+    from .estilo_referencia import rgb_da_foto
 
+    if isinstance(modelo, ModeloPares):  # IA por pares (original x editada)
+        rgb = np.asarray(carregar_reduzida(caminho_foto, 400).convert("RGB"), dtype=np.float64) / 255.0
+        return modelo.ajustar(ajustes, rgb, ler_iso(caminho_foto), forca)
+    if not isinstance(modelo, Modelo):  # IA por referência (aprendeu das fotos finais)
         return modelo.ajustar(ajustes, rgb_da_foto(caminho_foto), forca)
     img = reduzida if reduzida is not None else carregar_reduzida(caminho_foto, 500)
     previsto = modelo.prever(caracteristicas(img, ler_iso(caminho_foto)))
