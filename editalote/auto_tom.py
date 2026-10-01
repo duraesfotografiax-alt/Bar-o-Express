@@ -111,6 +111,7 @@ def calcular(rgb: np.ndarray, alvo: dict | None = None) -> dict:
 
     # 3a) níveis: pretos firmes e brancos limpos (é o que tira o "esbranquiçado")
     preto_novo = min(preto, alvo["preto"]) if preto < 0.2 else alvo["preto"] + (preto - alvo["preto"]) * 0.3
+    preto_novo = preto + (preto_novo - preto) * 0.75   # nunca afunda tudo de uma vez
     if branco < alvo["branco"]:
         branco_novo = alvo["branco"]
     else:                                  # brancos estourando: recupera um pouco (vestido)
@@ -128,16 +129,18 @@ def calcular(rgb: np.ndarray, alvo: dict | None = None) -> dict:
     def base(v):
         return niveis(v) ** gama
 
-    # 3c) contraste: escolhe a força do S que chega no contraste do alvo
+    # 3c) contraste: anda METADE do caminho até o contraste do alvo, com teto. Cena clara de
+    # tons pastel (aniversário, balões) tem pouco contraste por natureza e não pode virar "dura".
     yb = base(y2)
+    desvio_alvo = yb.std() + (alvo["desvio"] - yb.std()) * 0.5
     s_baixo, s_alto = -0.3, 0.6
     for _ in range(18):
         s = (s_baixo + s_alto) / 2
-        if _curva_s(yb, s).std() < alvo["desvio"]:
+        if _curva_s(yb, s).std() < desvio_alvo:
             s_baixo = s
         else:
             s_alto = s
-    s = float(np.clip((s_baixo + s_alto) / 2, -0.15, 0.45))
+    s = float(np.clip((s_baixo + s_alto) / 2, -0.1, 0.22))
 
     ys = np.clip(_curva_s(base(PONTOS_CURVA), s), 0.0, 1.0)
     ys[0] = min(ys[0], 0.0 + preto_novo)
@@ -147,7 +150,7 @@ def calcular(rgb: np.ndarray, alvo: dict | None = None) -> dict:
     # 4) saturação: mede depois da curva e completa com vibração até o alvo
     v3 = transformar(rgb, {**passo, "curva_ref": curva}, None)
     sat = _sat(v3)
-    vibracao = float(np.clip((alvo["saturacao"] / max(sat, 0.01) - 1) * 70, -15, 35))
+    vibracao = float(np.clip((alvo["saturacao"] / max(sat, 0.01) - 1) * 50, -15, 25))
     contraste_mostrado = float((np.interp(0.75, PONTOS_CURVA, ys) - np.interp(0.25, PONTOS_CURVA, ys) - 0.5) * 200)
     return {"exposicao": ev, "temperatura": temperatura, "matiz": matiz, "curva_ref": curva,
             "vibracao": vibracao, "contraste": contraste_mostrado}
