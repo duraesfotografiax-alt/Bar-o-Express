@@ -79,6 +79,10 @@ foto escura clareia, foto lavada ganha pretos e contraste, foto azulada esquenta
 recupera. Os controles da tela continuam valendo por cima (ex.: +10 de contraste deixa todas um
 pouco mais fortes que o padrão).
 
+**Pessoas em destaque:** a IA encontra as pessoas na foto (rosto e pele, com prioridade para o
+centro) e mede a exposição por elas, não pelo fundo escuro da festa. O controle **Realçar pessoas**
+(aba Básico, 0 a 100) clareia e destaca as pessoas, levando junto um pouco do cenário.
+
 Para copiar outro jeito (ex.: um cliente que quer mais claro), use **Aprender com: Copiar o jeito
 de fotos prontas** e escolha **uma** pasta com fotos já editadas: nasce um preset novo com a IA
 automática mirando nesse jeito.

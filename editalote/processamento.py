@@ -26,6 +26,7 @@ PESOS_Y = np.array([0.2126, 0.7152, 0.0722], dtype=np.float64)
 AJUSTES_PADRAO: dict = {
     "nome": "Natural",
     "auto_tom": 0,               # botão Auto (como o do Lightroom): 0 = desligado, 100 = força total
+    "realce_pessoas": 0,         # 0..100: clareia e destaca as pessoas (e de leve o cenário)
     "auto_exposicao": 0.7,       # 0 = desligado, 1 = corrige tudo
     "auto_balanco_branco": 0.4,  # 0 = desligado, 1 = neutro total
     "exposicao": 0.0,            # em EV (stops), -2..2
@@ -417,6 +418,11 @@ def aplicar(img: Image.Image, ajustes: dict, analise: Analise | None,
     textura = float(ajustes.get("textura", 0) or 0) / 100.0
     if textura:
         saida = contraste_local(saida, 0.6 * textura, lado=2400, raio_rel=0.002, so_meios_tons=False)
+    realce = float(ajustes.get("realce_pessoas", 0) or 0) / 100.0
+    if realce > 0:
+        from .assunto import realcar
+
+        saida = realcar(saida, realce)
     nitidez = float(ajustes.get("nitidez", 0))
     if nitidez > 0:
         # nitidez 3x3 (metade do custo de uma máscara de nitidez gaussiana)

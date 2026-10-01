@@ -20,6 +20,7 @@ from threading import Lock
 
 import numpy as np
 
+from .assunto import luz_das_pessoas
 from .estilo_referencia import cor_dos_neutros
 from .processamento import AJUSTES_PADRAO, PESOS_Y, carregar_reduzida, srgb_para_linear, transformar
 
@@ -27,7 +28,7 @@ _NEUTRO = {**AJUSTES_PADRAO, "auto_exposicao": 0, "auto_balanco_branco": 0}
 
 # Medido nas fotos finais da Durães (claras, pretos firmes, brancos limpos, levemente quentes)
 ALVO_DURAES = {"meio": 0.56, "preto": 0.045, "branco": 0.965, "desvio": 0.265,
-               "saturacao": 0.125, "quente": 0.12}
+               "saturacao": 0.125, "quente": 0.12, "pele": 0.62}
 PONTOS_CURVA = np.linspace(0.0, 1.0, 17)
 _AMOSTRAS = 40000
 
@@ -46,16 +47,21 @@ def _neutros(rgb: np.ndarray) -> tuple[float, float]:
 def medir_estilo(fotos_rgb: list[np.ndarray]) -> dict:
     """Mede o "jeito" de fotos já prontas (o alvo da IA automática)."""
     medidas = []
-    for rgb in fotos_rgb:
-        rgb = rgb.reshape(-1, 3)
+    for foto in fotos_rgb:
+        rgb = foto.reshape(-1, 3)
         y = rgb @ PESOS_Y
         p1, p50, p99 = np.percentile(y, [1, 50, 99])
         medidas.append({"meio": p50, "preto": p1, "branco": p99, "desvio": y.std(),
-                        "saturacao": _sat(rgb), "quente": _neutros(rgb)[0]})
-    alvo = {k: float(np.median([m[k] for m in medidas])) for k in ALVO_DURAES}
+                        "saturacao": _sat(rgb), "quente": _neutros(rgb)[0],
+                        "pele": luz_das_pessoas(foto) if foto.ndim == 3 else None})
+    alvo = {}
+    for k in ALVO_DURAES:
+        valores = [m[k] for m in medidas if m[k] is not None]
+        alvo[k] = float(np.median(valores)) if valores else ALVO_DURAES[k]
     # limites de segurança: um alvo exagerado (foto P&B, foto muito escura) não pode estragar tudo
     limites = {"meio": (0.38, 0.66), "preto": (0.0, 0.12), "branco": (0.85, 0.99),
-               "desvio": (0.17, 0.32), "saturacao": (0.03, 0.25), "quente": (-0.1, 0.35)}
+               "desvio": (0.17, 0.32), "saturacao": (0.03, 0.25), "quente": (-0.1, 0.35),
+               "pele": (0.45, 0.75)}
     return {k: round(float(np.clip(v, *limites[k])), 4) for k, v in alvo.items()}
 
 
@@ -67,6 +73,7 @@ def _curva_s(v: np.ndarray, s: float) -> np.ndarray:
 def calcular(rgb: np.ndarray, alvo: dict | None = None) -> dict:
     """Ajustes automáticos para esta foto (rgb 0..1 reduzida)."""
     alvo = {**ALVO_DURAES, **(alvo or {})}
+    rgb_cena = rgb if rgb.ndim == 3 else None
     rgb = rgb.reshape(-1, 3)
     if len(rgb) > _AMOSTRAS:
         rgb = rgb[np.linspace(0, len(rgb) - 1, _AMOSTRAS).astype(int)]
@@ -76,18 +83,25 @@ def calcular(rgb: np.ndarray, alvo: dict | None = None) -> dict:
     temperatura = float(np.clip(-0.7 * 200 * (quente - alvo["quente"]), -50, 50))
     matiz = float(np.clip(0.7 * 100 * verde / 0.15, -30, 30))
 
-    # 2) exposição pelos meios-tons, protegendo os brancos
+    # 2) exposição pelos meios-tons e, quando há gente, pela luz nas pessoas
     y = rgb @ PESOS_Y
     p50, p99 = np.percentile(y, [50, 99])
     meio_alvo = alvo["meio"]
-    if p50 < 0.18 and p99 > 0.75:       # noite/festa com luzes: clareia, mas continua noite
-        meio_alvo = min(meio_alvo, 0.40)
-    lin_alvo = float(srgb_para_linear(np.array([meio_alvo]))[0])
-    lin_foto = float(srgb_para_linear(np.array([max(p50, 0.01)]))[0])
-    ev = float(np.clip(np.log2(lin_alvo / lin_foto) * 0.85, -1.5, 1.8))
+    if p50 < 0.18 and p99 > 0.75:       # festa com luzes: clareia bem, mas sem virar dia
+        meio_alvo = min(meio_alvo, 0.47)
+    lin = lambda v: float(srgb_para_linear(np.array([min(max(v, 0.01), 1.0)]))[0])
+    ev_cena = float(np.log2(lin(meio_alvo) / lin(p50)))
+    luz_pessoas = luz_das_pessoas(rgb_cena) if rgb_cena is not None else None
+    if luz_pessoas is not None:         # quem importa é a pessoa: mede por ela
+        ev_pessoas = float(np.log2(lin(alvo["pele"]) / lin(luz_pessoas)))
+        ev = 0.65 * ev_pessoas + 0.35 * ev_cena
+    else:
+        ev = ev_cena
+    ev = float(np.clip(ev * 0.85, -1.5, 2.0))
     if ev > 0:
-        teto = float(srgb_para_linear(np.array([min(max(p99, 0.05), 1.0)]))[0])
-        ev = min(ev, max(0.0, float(np.log2(1.15 / teto))))    # a curva segura o resto
+        # luzes da festa e janelas podem estourar um pouco (a curva segura); a pessoa não
+        teto = lin(np.percentile(y, 97 if luz_pessoas is not None else 99))
+        ev = min(ev, max(0.0, float(np.log2(1.25 / teto))))
 
     # 3) medidas depois da exposição/cor
     passo = {**_NEUTRO, "exposicao": ev, "temperatura": temperatura, "matiz": matiz}

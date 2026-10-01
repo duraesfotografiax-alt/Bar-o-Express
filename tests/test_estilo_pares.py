@@ -104,3 +104,17 @@ def test_auto_segue_o_alvo_das_fotos_prontas(tmp_path):
     ajustes, _ = aplicar_auto(completar_ajustes({"auto_tom": 100, "auto_alvo": clara}), str(caminho))
     saida = np.asarray(aplicar(escura, ajustes, None), dtype=float) / 255
     assert np.median(saida @ [0.2126, 0.7152, 0.0722]) > 0.45
+
+
+def test_realce_pessoas_clareia_quem_esta_na_foto():
+    from editalote.assunto import luz_das_pessoas, pele
+
+    rgb = np.full((200, 150, 3), 0.12)
+    rgb[50:110, 50:100] = [0.42, 0.30, 0.24]           # um "rosto" na sombra, no centro
+    assert pele(rgb)[80, 75] > 0.5 and pele(rgb)[5, 5] == 0
+    img = Image.fromarray((rgb * 255).astype(np.uint8))
+    base = completar_ajustes({"auto_exposicao": 0, "auto_balanco_branco": 0})
+    sem = np.asarray(aplicar(img, base, None), dtype=float) / 255
+    com = np.asarray(aplicar(img, {**base, "realce_pessoas": 80}, None), dtype=float) / 255
+    assert luz_das_pessoas(com) > luz_das_pessoas(sem) + 0.03
+    assert com[5, 5].mean() >= sem[5, 5].mean()         # cenário: no máximo um pouco mais claro

@@ -3,6 +3,7 @@
 const GRUPOS = {
   slidersAuto: [
     ["auto_tom", "Força do Auto", 0, 100, 5, "Botão Auto (como o do Lightroom). 0 = desligado. Com a IA de estilo ligada, a IA faz esse papel."],
+    ["realce_pessoas", "Realçar pessoas", 0, 100, 5, "A IA acha as pessoas (rosto, pele) e deixa elas mais claras e em destaque, com um pouco do cenário junto"],
     ["auto_exposicao", "Igualar brilho", 0, 1, 0.05, "Automático antigo: só iguala o brilho (0 = desligado)"],
     ["auto_balanco_branco", "Igualar cor", 0, 1, 0.05, "Automático antigo: só neutraliza a cor (0 = desligado)"],
   ],
@@ -485,7 +486,7 @@ function filtroInstantaneo() {
   const d = $("imgDepois");
   if (!d || !ajustesMostrados) return;
   const dif = k => (+ajustes[k] || 0) - (+ajustesMostrados[k] || 0);
-  const luz = 2 ** (0.55 * dif("exposicao")) * (1 + 0.002 * (dif("brancos") + dif("sombras") * 0.5));
+  const luz = 2 ** (0.55 * dif("exposicao")) * (1 + 0.002 * (dif("brancos") + dif("sombras") * 0.5 + dif("realce_pessoas") * 0.6));
   const contraste = 1 + 0.006 * dif("contraste") + 0.002 * (dif("claridade") - dif("pretos"));
   const sat = Math.max(0, 1 + 0.009 * dif("saturacao") + 0.006 * dif("vibracao"));
   const temp = dif("temperatura"), matiz = dif("matiz");
