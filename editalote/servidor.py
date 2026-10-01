@@ -193,7 +193,7 @@ def escanear():
     pasta = dados.get("pasta", "")
     if not os.path.isdir(pasta):
         return jsonify({"erro": "Pasta não encontrada"}), 400
-    amostras = max(1, min(int(dados.get("amostras") or 12), 60))
+    amostras = max(1, min(int(dados.get("amostras") or 12), 20000))
     return jsonify(resumo_pasta(pasta, ignorar=dados.get("saida") or None, amostras=amostras))
 
 

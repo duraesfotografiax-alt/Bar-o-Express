@@ -118,3 +118,42 @@ def test_realce_pessoas_clareia_quem_esta_na_foto():
     com = np.asarray(aplicar(img, {**base, "realce_pessoas": 80}, None), dtype=float) / 255
     assert luz_das_pessoas(com) > luz_das_pessoas(sem) + 0.03
     assert com[5, 5].mean() >= sem[5, 5].mean()         # cenário: no máximo um pouco mais claro
+
+
+def test_ajuste_so_desta_foto_vale_so_para_ela(tmp_path):
+    from editalote.processamento import ajustes_individuais, chave_foto
+
+    a, b = str(tmp_path / "a.jpg"), str(tmp_path / "b.jpg")
+    ajustes = completar_ajustes({"exposicao": 0.2, "por_foto": {chave_foto(a): {"exposicao": 0.5, "contraste": 10}}})
+    so_a = ajustes_individuais(ajustes, a)
+    assert so_a["exposicao"] == 0.7 and so_a["contraste"] == 10 and "por_foto" not in so_a
+    assert ajustes_individuais(ajustes, b)["exposicao"] == 0.2
+
+
+def test_lote_aplica_o_ajuste_individual(tmp_path):
+    from editalote.lote import Trabalho
+    from editalote.processamento import chave_foto
+
+    entrada, saida = tmp_path / "fotos", tmp_path / "saida"
+    entrada.mkdir()
+    cinza = Image.fromarray(np.full((120, 160, 3), 110, np.uint8))
+    for nome in ("a.jpg", "b.jpg"):
+        cinza.save(entrada / nome, quality=95)
+    ajustes = {"auto_exposicao": 0, "auto_balanco_branco": 0,
+               "por_foto": {chave_foto(str(entrada / "a.jpg")): {"exposicao": 1.0}}}
+    t = Trabalho(str(entrada), str(saida), ajustes, {"renomear": False})
+    t.executar(processos=1)
+    assert t.estado == "concluido", t.mensagem
+    media = lambda n: np.asarray(Image.open(saida / n), dtype=float).mean()
+    assert media("a.jpg") > media("b.jpg") + 25
+
+
+def test_melhorar_qualidade_tira_ruido():
+    from editalote.qualidade import melhorar, medir_ruido
+
+    rng = np.random.default_rng(3)
+    limpa = np.asarray(cena_final(2).resize((800, 1200)), dtype=float) * 0.5
+    ruidosa = Image.fromarray(np.clip(limpa + rng.normal(0, 9, limpa.shape), 0, 255).astype(np.uint8))
+    assert medir_ruido(ruidosa) > 3
+    melhor = np.asarray(melhorar(ruidosa, 0.8), dtype=float)
+    assert np.abs(melhor - limpa).mean() < np.abs(np.asarray(ruidosa, dtype=float) - limpa).mean() * 0.75

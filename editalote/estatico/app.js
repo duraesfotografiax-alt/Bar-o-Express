@@ -19,6 +19,7 @@ const GRUPOS = {
   slidersDetalhe: [
     ["claridade", "Claridade", -100, 100, 1, "Contraste de áreas médias (dá 'destaque')"],
     ["textura", "Textura", -100, 100, 1, "Detalhes finos; negativo suaviza a pele"],
+    ["melhorar_qualidade", "Melhorar qualidade", 0, 100, 5, "Tira o ruído de foto escura (ISO alto) e realça os detalhes (cabelo, olhos, tecido)"],
     ["nitidez", "Nitidez", 0, 100, 1],
   ],
   slidersLut: [["lut_intensidade", "Força da LUT", 0, 100, 1]],
@@ -87,7 +88,7 @@ function htmlSliders(lista) {
   return lista.map(([k, nome, min, max, passo, dica]) => `
     <div class="slider" title="${esc(dica || "Dois cliques voltam para o zero")}"><span>${nome}</span>
       <input type="range" id="s_${k}" min="${min}" max="${max}" step="${passo}"
-        oninput="ajustes['${k}']=+this.value; $('o_${k}').value=this.value; mudou()"
+        oninput="mudarControle('${k}', +this.value)"
         ondblclick="resetar('${k}')">
       <output id="o_${k}"></output></div>`).join("");
 }
@@ -108,10 +109,63 @@ function abrirAba(btn) {
   document.querySelectorAll(".aba").forEach(a => a.classList.toggle("ativa", a.dataset.aba === btn.dataset.aba));
   if (btn.dataset.aba === "curvas") desenharCurva();
 }
+// ------------------------------------------------- só esta foto x todas as fotos
+// Por padrão os controles mexem SÓ na foto aberta (guardado como diferença em cima do padrão).
+// Com "Todas as fotos" ligado, mexem no padrão de todas.
+let porFoto = {}, modoTodas = false;
+const CONTROLES_NUM = new Set(TODOS_CONTROLES.map(c => c[0]));
+function efetivos() {
+  const final = {...ajustes};
+  for (const [k, d] of Object.entries((fotoAtual && porFoto[fotoAtual]) || {}))
+    final[k] = (+final[k] || 0) + d;
+  return final;
+}
+function mudarControle(k, v) {
+  if (modoTodas || !fotoAtual) {
+    ajustes[k] = v;
+  } else {
+    const d = +(v - (+ajustes[k] || 0)).toFixed(4);
+    const atual = porFoto[fotoAtual] = porFoto[fotoAtual] || {};
+    if (Math.abs(d) < 1e-6) delete atual[k]; else atual[k] = d;
+    if (!Object.keys(atual).length) delete porFoto[fotoAtual];
+    guardarPorFoto();
+  }
+  $("o_" + k).value = v;
+  mudou();
+}
+function definirModo(todas) {
+  modoTodas = todas;
+  $("modoFoto").classList.toggle("ativa", !todas);
+  $("modoTodas").classList.toggle("ativa", todas);
+  $("dicaModo").textContent = todas
+    ? "Os controles mudam TODAS as fotos (o padrão do evento)."
+    : "Os controles mudam só a foto aberta. As outras continuam como estão.";
+}
+function desfazerFoto() {
+  if (!fotoAtual || !porFoto[fotoAtual]) { aviso("Esta foto não tem ajuste individual"); return; }
+  delete porFoto[fotoAtual]; guardarPorFoto(); mostrarAjustes(); mudou();
+  aviso("Ajustes desta foto desfeitos: ela volta ao padrão do evento");
+}
+function chavePorFoto() { return "duraes_porfoto:" + ($("entrada").value.trim() || ""); }
+function guardarPorFoto() {
+  try { localStorage.setItem(chavePorFoto(), JSON.stringify(porFoto)); } catch (e) {}
+  marcarAjustadas();
+}
+function lerPorFoto() {
+  try { porFoto = JSON.parse(localStorage.getItem(chavePorFoto()) || "{}") || {}; } catch (e) { porFoto = {}; }
+}
+function marcarAjustadas() {
+  document.querySelectorAll("#amostras img").forEach(img =>
+    img.classList.toggle("ajustada", !!porFoto[decodeURIComponent(img.dataset.caminho)]));
+  const n = Object.keys(porFoto).length;
+  if ($("qtdAjustadas")) $("qtdAjustadas").textContent = n ? `${n} foto${n > 1 ? "s" : ""} com ajuste individual` : "";
+}
+
 function mostrarAjustes() {
+  const ef = efetivos();
   for (const [k] of TODOS_CONTROLES) {
-    const v = ajustes[k] ?? 0;
-    $("s_" + k).value = v; $("o_" + k).value = v;
+    const v = ef[k] ?? 0;
+    $("s_" + k).value = v; $("o_" + k).value = +(+v).toFixed(2);
   }
   $("s_ia_forca").value = ajustes.ia_forca ?? 100; $("o_ia_forca").value = ajustes.ia_forca ?? 100;
   $("btnAuto").className = +(ajustes.auto_tom || 0) > 0 ? "destaque" : "contorno";
@@ -119,7 +173,14 @@ function mostrarAjustes() {
   mostrarIA();
   desenharCurva();
 }
-function resetar(k) { ajustes[k] = (k === "lut_intensidade") ? 100 : 0; mostrarAjustes(); mudou(); }
+function resetar(k) {
+  if (!modoTodas && fotoAtual && porFoto[fotoAtual]?.[k] !== undefined) {
+    delete porFoto[fotoAtual][k];
+    if (!Object.keys(porFoto[fotoAtual]).length) delete porFoto[fotoAtual];
+    guardarPorFoto();
+  } else ajustes[k] = (k === "lut_intensidade") ? 100 : 0;
+  mostrarAjustes(); mudou();
+}
 
 // ------------------------------------------------------------------- presets
 async function carregarPresets(selecionar) {
@@ -140,7 +201,7 @@ function usarPreset() {
 async function salvarPreset() {
   const nome = prompt("Nome do preset:", presets[$("preset").value]?.nome || "Meu padrão");
   if (!nome) return;
-  const r = await api("/api/presets", {...ajustes, nome});
+  const r = await api("/api/presets", {...ajustes, nome, por_foto: undefined});
   await carregarPresets(r.arquivo);
   aviso(`Preset "${nome}" salvo`);
 }
@@ -372,7 +433,8 @@ async function escanear() {
   if (!pasta) return;
   $("resumo").textContent = "Lendo…";
   try {
-    const r = await api("/api/escanear", {pasta, saida: $("saida").value.trim(), amostras: 40});
+    const r = await api("/api/escanear", {pasta, saida: $("saida").value.trim(), amostras: 20000});
+    lerPorFoto();
     $("resumo").textContent = `${num(r.total, 0)} fotos`;
     cameras = r.cameras;
     montarCameras();
@@ -380,6 +442,7 @@ async function escanear() {
       `<img loading="lazy" src="/api/miniatura?caminho=${encodeURIComponent(a.caminho)}&lado=220"
         title="${esc(a.nome)} — ${esc(a.camera)}" data-caminho="${encodeURIComponent(a.caminho)}"
         onclick="selecionar(this)">`).join("") || `<span class="info">Nenhuma foto JPEG nessa pasta</span>`;
+    marcarAjustadas();
     const primeira = $("amostras").querySelector("img");
     if (primeira) { selecionar(primeira); passo(2); }
   } catch (e) { $("resumo").innerHTML = `<span class="erro">${esc(e.message)}</span>`; }
@@ -431,11 +494,15 @@ function selecionar(img) {
       <span class="rotulo" style="left:10px">Antes</span>
       <span class="rotulo" style="right:10px">Depois</span>
     </div>
+    <button class="btn-comparar${modoComparar ? " ativa" : ""}" id="btnComparar" onclick="alternarComparar()"
+      title="Liga/desliga a comparação antes e depois (tecla C)">◧ Antes / Depois</button>
     <div class="chip-ia" id="chipIA"></div>
     <div class="carregando" id="carregando"></div>`;
-  $("imgAntes").onload = () => posicionar(0.5);
+  $("imgAntes").onload = () => posicionar(modoComparar ? 0.5 : 0);
+  $("comparar").classList.toggle("inteira", !modoComparar);
   ligarArraste();
   ajustesMostrados = null;
+  mostrarAjustes();
   pedirPrevia();
 }
 function trocarFoto(passoFoto) {
@@ -458,13 +525,22 @@ function posicionar(f) {
 }
 function ligarArraste() {
   const c = $("comparar");
-  const mover = e => { const r = c.getBoundingClientRect(); posicionar((e.clientX - r.left) / r.width); };
+  const mover = e => { if (!modoComparar) return; const r = c.getBoundingClientRect(); posicionar((e.clientX - r.left) / r.width); };
   let arrastando = false;
   c.addEventListener("pointerdown", e => { arrastando = true; mover(e); });
   window.addEventListener("pointermove", e => arrastando && mover(e));
   window.addEventListener("pointerup", () => arrastando = false);
 }
-window.addEventListener("resize", () => { const c = $("comparar"); if (c) posicionar(+c.dataset.f || 0.5); });
+window.addEventListener("resize", () => { const c = $("comparar"); if (c) posicionar(modoComparar ? (+c.dataset.f || 0.5) : 0); });
+
+// Antes/Depois: por padrão a foto aparece INTEIRA (editada); o botão liga a comparação
+let modoComparar = false;
+function alternarComparar() {
+  modoComparar = !modoComparar;
+  $("btnComparar").classList.toggle("ativa", modoComparar);
+  const c = $("comparar");
+  if (c) { c.classList.toggle("inteira", !modoComparar); posicionar(modoComparar ? 0.5 : 0); }
+}
 
 // Prévia rápida: enquanto arrasta, a imagem já muda na hora (filtro da tela) e o programa
 // calcula a versão exata em seguida; nunca fica uma fila de prévias esperando.
@@ -485,7 +561,8 @@ async function pedirPrevia() {
 function filtroInstantaneo() {
   const d = $("imgDepois");
   if (!d || !ajustesMostrados) return;
-  const dif = k => (+ajustes[k] || 0) - (+ajustesMostrados[k] || 0);
+  const ef = efetivos();
+  const dif = k => (+ef[k] || 0) - (+ajustesMostrados[k] || 0);
   const luz = 2 ** (0.55 * dif("exposicao")) * (1 + 0.002 * (dif("brancos") + dif("sombras") * 0.5 + dif("realce_pessoas") * 0.6));
   const contraste = 1 + 0.006 * dif("contraste") + 0.002 * (dif("claridade") - dif("pretos"));
   const sat = Math.max(0, 1 + 0.009 * dif("saturacao") + 0.006 * dif("vibracao"));
@@ -508,7 +585,7 @@ async function atualizarPrevia() {
   if (!fotoAtual) return;
   const alvo = fotoAtual;
   $("carregando") && ($("carregando").style.display = "block");
-  const pedidos = structuredClone(ajustes);
+  const pedidos = structuredClone(efetivos());
   const r = await fetch("/api/previa", {method: "POST", headers: {"Content-Type": "application/json"},
     body: JSON.stringify({caminho: alvo, ajustes: pedidos, lado: 1600})});
   if ($("carregando")) $("carregando").style.display = "none";
@@ -526,7 +603,7 @@ async function atualizarPrevia() {
       if (velho) URL.revokeObjectURL(velho);
       ajustesMostrados = enviados;
       filtroInstantaneo();          // só sobra filtro se o controle mudou de novo nesse meio tempo
-      posicionar(+$("comparar").dataset.f || 0.5);
+      posicionar(modoComparar ? (+$("comparar").dataset.f || 0.5) : 0);
       pronto();
     };
     d.src = url;
@@ -538,6 +615,7 @@ document.addEventListener("keydown", e => {
   if (["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName) &&
       document.activeElement.type !== "range") return;
   if (e.key === "ArrowRight") { trocarFoto(1); e.preventDefault(); }
+  if (e.key === "c" || e.key === "C") alternarComparar();
   if (e.key === "ArrowLeft") { trocarFoto(-1); e.preventDefault(); }
   if (e.code === "Space" && $("comparar")) { $("comparar").classList.add("so-antes"); e.preventDefault(); }
 });
@@ -553,7 +631,7 @@ async function processar() {
   } catch (e) { aviso(e.message, true); return; }
   const corpo = {
     entrada: $("entrada").value.trim(), saida: $("saida").value.trim(),
-    ajustes: {...ajustes, lut: $("lut").value.trim() || null},
+    ajustes: {...ajustes, lut: $("lut").value.trim() || null, por_foto: porFoto},
     opcoes: {
       renomear: $("renomear").checked, prefixo: $("prefixo").value.trim(),
       qualidade: +$("qualidade").value, versao_web: $("versao_web").checked,

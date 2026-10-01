@@ -27,6 +27,7 @@ AJUSTES_PADRAO: dict = {
     "nome": "Natural",
     "auto_tom": 0,               # botão Auto (como o do Lightroom): 0 = desligado, 100 = força total
     "realce_pessoas": 0,         # 0..100: clareia e destaca as pessoas (e de leve o cenário)
+    "melhorar_qualidade": 0,     # 0..100: tira ruído (ISO alto) e realça os detalhes
     "auto_exposicao": 0.7,       # 0 = desligado, 1 = corrige tudo
     "auto_balanco_branco": 0.4,  # 0 = desligado, 1 = neutro total
     "exposicao": 0.0,            # em EV (stops), -2..2
@@ -96,6 +97,22 @@ def ajustes_para_camera(ajustes: dict, camera: str | None) -> dict:
     for campo in CAMPOS_POR_CAMERA:
         if campo in extra:
             final[campo] = float(final.get(campo, 0)) + float(extra[campo] or 0)
+    return final
+
+
+def chave_foto(caminho: str) -> str:
+    """Mesma foto = mesma chave, mesmo com barras ou maiúsculas diferentes (Windows)."""
+    return os.path.normcase(os.path.abspath(caminho))
+
+
+def ajustes_individuais(ajustes: dict, caminho: str) -> dict:
+    """Soma os ajustes feitos só nesta foto ("Só esta foto" na tela) aos ajustes de todas."""
+    por_foto = ajustes.get("por_foto") or {}
+    final = {k: v for k, v in ajustes.items() if k != "por_foto"}
+    extra = por_foto.get(chave_foto(caminho)) or por_foto.get(caminho) or {}
+    for campo, delta in extra.items():
+        if isinstance(final.get(campo, 0), (int, float)) and isinstance(delta, (int, float)):
+            final[campo] = float(final.get(campo, 0) or 0) + float(delta)
     return final
 
 
@@ -423,6 +440,11 @@ def aplicar(img: Image.Image, ajustes: dict, analise: Analise | None,
         from .assunto import realcar
 
         saida = realcar(saida, realce)
+    qualidade = float(ajustes.get("melhorar_qualidade", 0) or 0) / 100.0
+    if qualidade > 0:
+        from .qualidade import melhorar
+
+        saida = melhorar(saida, qualidade)
     nitidez = float(ajustes.get("nitidez", 0))
     if nitidez > 0:
         # nitidez 3x3 (metade do custo de uma máscara de nitidez gaussiana)
@@ -472,7 +494,7 @@ def previa_jpeg(caminho: str, ajustes: dict, lado: int = 1400) -> tuple[bytes, d
     from .estilo_ia import ajustes_da_foto
     from .metadados import ler_info
 
-    ajustes = ajustes_para_camera(completar_ajustes(ajustes), ler_info(caminho).camera)
+    ajustes = ajustes_para_camera(ajustes_individuais(completar_ajustes(ajustes), caminho), ler_info(caminho).camera)
     ajustes, ajuste_ia = ajustes_da_foto(ajustes, caminho)
     from .auto_tom import aplicar_auto
 

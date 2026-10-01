@@ -140,6 +140,18 @@
     </div>
     <p id="lrMsg" class="dica"></p>
 
+    <div class="escopo">
+      <div class="seg">
+        <button id="modoFoto" class="ativa" onclick="definirModo(false)" title="Os controles mudam só a foto aberta">Só esta foto</button>
+        <button id="modoTodas" onclick="definirModo(true)" title="Os controles mudam o padrão de todas as fotos">Todas as fotos</button>
+      </div>
+      <p class="dica" id="dicaModo">Os controles mudam só a foto aberta. As outras continuam como estão.</p>
+      <div class="linha" style="justify-content:space-between">
+        <small class="dica" id="qtdAjustadas"></small>
+        <button class="fantasma" onclick="desfazerFoto()" title="Volta esta foto ao padrão do evento">Desfazer esta foto</button>
+      </div>
+    </div>
+
     <div class="abas" id="abas">
       <button class="ativa" data-aba="basico" onclick="abrirAba(this)">Básico</button>
       <button data-aba="cor" onclick="abrirAba(this)">Cor</button>

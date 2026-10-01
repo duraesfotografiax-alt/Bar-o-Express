@@ -20,6 +20,7 @@ from .estilo_ia import ajustes_da_foto
 from .metadados import InfoFoto, ler_info, listar_jpegs
 from .processamento import (
     aplicar,
+    ajustes_individuais,
     ajustes_para_camera,
     analisar,
     carregar_lut,
@@ -210,7 +211,7 @@ class Trabalho:
 
         tarefas = []
         for item in plano:
-            ajustes_cam = ajustes_para_camera(ajustes, item.info.camera)
+            ajustes_cam = ajustes_para_camera(ajustes_individuais(ajustes, item.info.caminho), item.info.camera)
             web = os.path.join(pasta_web, item.nome_saida) if pasta_web else None
             tarefas.append((item.info.caminho, os.path.join(saida, item.nome_saida),
                             ajustes_cam, opcoes, web))

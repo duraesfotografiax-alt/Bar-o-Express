@@ -266,3 +266,17 @@ kbd { font: 600 10.5px "Montserrat"; background: var(--painel-3); border: 1px so
 .chave input:checked + i { background: var(--laranja); }
 .chave input:checked + i::after { left: 19px; }
 .vazio-projetos { color: var(--suave); padding: 40px; text-align: center; border: 1px dashed var(--borda); border-radius: var(--raio); }
+
+/* ------------------------------------------------- só esta foto / todas · antes e depois */
+.escopo { margin: 4px 0 12px; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: var(--painel); border: 1px solid var(--borda);
+  border-radius: 999px; padding: 4px; }
+.seg button { background: transparent; border: 0; border-radius: 999px; padding: 7px 10px; color: var(--suave); }
+.seg button.ativa { background: var(--botao); color: #1c0c00; font-weight: 600; }
+.escopo .dica { margin: 6px 2px 0; }
+.comparar.inteira .alca, .comparar.inteira .rotulo { display: none; }
+.btn-comparar { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 3; padding: 6px 14px;
+  border-radius: 999px; background: rgba(10, 10, 10, .78); border: 1px solid var(--borda); color: var(--texto);
+  backdrop-filter: blur(6px); font-size: 12px; }
+.btn-comparar.ativa { background: var(--botao); color: #1c0c00; border-color: transparent; }
+.tira img.ajustada { border-bottom: 4px solid var(--laranja); }

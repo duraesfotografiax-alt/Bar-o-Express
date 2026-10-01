@@ -92,6 +92,27 @@ Para copiar outro jeito (ex.: um cliente que quer mais claro), use **Aprender co
 de fotos prontas** e escolha **uma** pasta com fotos já editadas: nasce um preset novo com a IA
 automática mirando nesse jeito.
 
+### Só esta foto × Todas as fotos
+
+Acima das abas de ajuste há a escolha **Só esta foto / Todas as fotos**:
+- **Só esta foto** (padrão): mexer em Exposição, Contraste etc. muda **só a foto aberta**. A
+  miniatura ganha uma marca laranja. **Desfazer esta foto** volta ela ao padrão do evento.
+- **Todas as fotos**: os controles mudam o padrão de todas.
+
+Os ajustes individuais ficam guardados no computador (por pasta) e entram na exportação. A tira de
+baixo mostra **todas** as fotos do evento.
+
+### Antes / Depois
+
+A foto aparece **inteira, já editada**. O botão **◧ Antes / Depois** (ou a tecla **C**) liga a
+comparação com a alça no meio. Segurar **Espaço** mostra o antes.
+
+### Melhorar qualidade (aba Detalhes)
+
+Para fotos escuras de festa (ISO alto): mede o ruído da foto, tira as manchinhas coloridas e o
+granulado na medida certa e realça os detalhes (cabelo, olhos, tecido) sem afiar o granulado.
+0 = desligado. Pode ser usado só numa foto (Só esta foto) ou em todas.
+
 ### Botão Auto (como o do Lightroom)
 
 Na aba **Básico**, o botão **Auto** acerta cada foto sozinha, sem treino: balanço de branco pelo
