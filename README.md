@@ -73,7 +73,12 @@ usaram em cada tipo de foto e repete.
 
 ### ✦ Durães IA (automática) — já vem pronta, sem treino
 
-É o primeiro preset da lista. Em **cada foto** a IA mede brilho, pretos, brancos, contraste, cor
+São os primeiros presets da lista, um para cada jeito da Durães:
+- **Aniversário (claro e suave)**: medido numa foto de aniversário editada no Lightroom (bem clara,
+  pretos suaves, pouco contraste, cor natural).
+- **Casamento (contraste e cor)**: medido nas fotos finais de casamento (pretos firmes, mais
+  contraste, levemente quente).
+ Em **cada foto** a IA mede brilho, pretos, brancos, contraste, cor
 da luz e saturação e calcula a edição que leva aquela foto até o jeito das fotos finais da Durães:
 foto escura clareia, foto lavada ganha pretos e contraste, foto azulada esquenta, vestido estourado
 recupera. Os controles da tela continuam valendo por cima (ex.: +10 de contraste deixa todas um

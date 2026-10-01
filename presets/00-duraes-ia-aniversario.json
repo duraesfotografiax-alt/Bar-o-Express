@@ -1,0 +1,17 @@
+{
+  "nome": "Durães IA · Aniversário (claro e suave)",
+  "auto_tom": 100,
+  "auto_exposicao": 0,
+  "auto_balanco_branco": 0,
+  "nitidez": 10,
+  "realce_pessoas": 50,
+  "auto_alvo": {
+    "meio": 0.84,
+    "preto": 0.188,
+    "branco": 0.969,
+    "desvio": 0.167,
+    "saturacao": 0.139,
+    "quente": 0.018,
+    "pele": 0.75
+  }
+}

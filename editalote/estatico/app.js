@@ -125,7 +125,7 @@ function resetar(k) { ajustes[k] = (k === "lut_intensidade") ? 100 : 0; mostrarA
 async function carregarPresets(selecionar) {
   presets = await api("/api/presets");
   $("preset").innerHTML = presets.map((p, i) =>
-    `<option value="${i}">${p.estilo_ia || p.auto_alvo || p.arquivo === "00-duraes-ia.json" ? "✦ " : ""}${esc(p.nome)}</option>`).join("");
+    `<option value="${i}">${p.estilo_ia || p.auto_alvo || p.arquivo.startsWith("00-duraes-ia") ? "✦ " : ""}${esc(p.nome)}</option>`).join("");
   const i = selecionar ? presets.findIndex(p => p.arquivo === selecionar) : 0;
   $("preset").value = Math.max(0, i);
   usarPreset();
@@ -188,7 +188,7 @@ function mostrarIA() {
   $("btnTreinar").className = ativo ? "contorno" : "destaque";
   $("iaInfo").textContent = ativo
     ? "IA ligada: cada foto recebe o ajuste que vocês dariam nela. Os controles abaixo são o padrão do estilo; mexer neles muda todas as fotos."
-    : "Já vem pronta: o preset ✦ Durães IA (automática) analisa e edita cada foto sozinho, no jeito das fotos finais da Durães. Opcional: ensine outro jeito com uma pasta de fotos prontas.";
+    : "Já vem pronta: os presets ✦ Durães IA (Aniversário e Casamento) analisam e editam cada foto sozinhos, no jeito da Durães. Opcional: ensine outro jeito com uma pasta de fotos prontas.";
 }
 async function escolherPastaIA() {
   const pasta = await dialogo("pasta");

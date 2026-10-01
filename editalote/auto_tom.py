@@ -59,8 +59,8 @@ def medir_estilo(fotos_rgb: list[np.ndarray]) -> dict:
         valores = [m[k] for m in medidas if m[k] is not None]
         alvo[k] = float(np.median(valores)) if valores else ALVO_DURAES[k]
     # limites de segurança: um alvo exagerado (foto P&B, foto muito escura) não pode estragar tudo
-    limites = {"meio": (0.38, 0.66), "preto": (0.0, 0.12), "branco": (0.85, 0.99),
-               "desvio": (0.17, 0.32), "saturacao": (0.03, 0.25), "quente": (-0.1, 0.35),
+    limites = {"meio": (0.38, 0.86), "preto": (0.0, 0.25), "branco": (0.85, 0.99),
+               "desvio": (0.12, 0.32), "saturacao": (0.03, 0.25), "quente": (-0.1, 0.35),
                "pele": (0.45, 0.75)}
     return {k: round(float(np.clip(v, *limites[k])), 4) for k, v in alvo.items()}
 
@@ -110,8 +110,11 @@ def calcular(rgb: np.ndarray, alvo: dict | None = None) -> dict:
     preto, meio, branco = np.percentile(y2, [1, 50, 99])
 
     # 3a) níveis: pretos firmes e brancos limpos (é o que tira o "esbranquiçado")
-    preto_novo = min(preto, alvo["preto"]) if preto < 0.2 else alvo["preto"] + (preto - alvo["preto"]) * 0.3
-    preto_novo = preto + (preto_novo - preto) * 0.75   # nunca afunda tudo de uma vez
+    if alvo["preto"] > 0.08:               # estilo claro e suave (pretos "leitosos"): sobe os pretos
+        preto_novo = preto + (alvo["preto"] - preto) * 0.5
+    else:
+        preto_novo = min(preto, alvo["preto"]) if preto < 0.2 else alvo["preto"] + (preto - alvo["preto"]) * 0.3
+        preto_novo = preto + (preto_novo - preto) * 0.75   # nunca afunda tudo de uma vez
     if branco < alvo["branco"]:
         branco_novo = alvo["branco"]
     else:                                  # brancos estourando: recupera um pouco (vestido)
