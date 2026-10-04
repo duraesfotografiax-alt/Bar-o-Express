@@ -14,6 +14,24 @@ permissions:
   contents: write  # para publicar a versão (Release)
 
 jobs:
+  # Modelo de IA para "Remover objeto" (LaMa, licença Apache-2.0), baixado do Hugging Face
+  modelo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o modelo LaMa (ONNX)
+        run: |
+          mkdir -p modelo
+          curl -sSL https://huggingface.co/api/models/Carve/LaMa-ONNX > modelo/lista.json || true
+          cat modelo/lista.json | head -c 3000; echo
+          curl -fSL -o modelo/lama_fp32.onnx https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp32.onnx
+          ls -la modelo
+          sha256sum modelo/lama_fp32.onnx
+      - uses: actions/upload-artifact@v4
+        with:
+          name: modelo-lama
+          path: modelo
+          retention-days: 30
+
   windows:
     runs-on: windows-latest
     steps:

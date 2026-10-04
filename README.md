@@ -138,7 +138,8 @@ precisam ser treinados de novo para ganhar isso.
 - **Auto**: endireita pelas linhas retas da foto (paredes, portas, horizonte). Se a foto não tem
   linhas retas confiáveis, não gira.
 - Vale por foto (**Só esta foto**). Com **Todas as fotos**, a proporção escolhida corta todas as
-  fotos do evento, centralizado (em pé ou deitada, a proporção acompanha a foto).
+  fotos do evento, centralizado. A proporção é exatamente a escolhida (9:16 sempre em pé, 16:9 sempre
+deitada).
 - Fotos feitas com a câmera em pé agora aparecem e saem em pé.
 
 ### Botão Auto (como o do Lightroom)

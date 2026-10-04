@@ -177,8 +177,11 @@ function lerPorFoto() {
   try { porFoto = JSON.parse(localStorage.getItem(chavePorFoto()) || "{}") || {}; } catch (e) { porFoto = {}; }
 }
 function marcarAjustadas() {
-  document.querySelectorAll("#amostras img").forEach(img =>
-    img.classList.toggle("ajustada", !!porFoto[decodeURIComponent(img.dataset.caminho)]));
+  document.querySelectorAll("#amostras img").forEach(img => {
+    const c = decodeURIComponent(img.dataset.caminho);
+    img.classList.toggle("ajustada", !!porFoto[c]);
+    img.classList.toggle("removida", removidas.has(c));
+  });
   const n = Object.keys(porFoto).length;
   if ($("qtdAjustadas")) $("qtdAjustadas").textContent = n ? `${n} foto${n > 1 ? "s" : ""} com ajuste individual` : "";
 }
@@ -471,6 +474,9 @@ async function escanear() {
     $("resumo").textContent = `${num(r.total, 0)} fotos`;
     cameras = r.cameras;
     montarCameras();
+    todasFotos = r.amostras.map(a => ({caminho: a.caminho, nome: a.nome}));
+    lerRemovidas();
+    if (visao === "grade") montarGrade();
     $("amostras").innerHTML = r.amostras.map(a =>
       `<img loading="lazy" src="/api/miniatura?caminho=${encodeURIComponent(a.caminho)}&lado=220"
         title="${esc(a.nome)} — ${esc(a.camera)}" data-caminho="${encodeURIComponent(a.caminho)}"
@@ -632,9 +638,7 @@ function razaoProporcao(prop, w, h) {
   if (!prop || prop === "livre") return null;
   if (prop === "original") return w / h;
   const [a, b] = prop.split(":").map(Number);
-  let r = a / b;
-  if ((r > 1) !== (w > h) && Math.abs(r - 1) > 1e-6) r = 1 / r;
-  return r;
+  return a / b;   // exatamente como escolhido: 9:16 é sempre em pé, 16:9 sempre deitado
 }
 function corteCentral(prop, w, h) {
   const r = razaoProporcao(prop, w, h);
@@ -722,6 +726,90 @@ function ligarCorte(caixa) {
   caixa.addEventListener("pointercancel", soltar);
 }
 
+// ------------------------------------------------------------------ grade e seleção
+// Fotos "removidas" não são apagadas do disco: só ficam fora da exportação.
+let todasFotos = [], removidas = new Set(), selecionadas = new Set(), visao = "foto", ultimaClicada = null;
+function chaveRemovidas() { return "duraes_removidas:" + ($("entrada").value.trim() || ""); }
+function lerRemovidas() {
+  try { removidas = new Set(JSON.parse(localStorage.getItem(chaveRemovidas()) || "[]")); } catch (e) { removidas = new Set(); }
+}
+function guardarRemovidas() {
+  try { localStorage.setItem(chaveRemovidas(), JSON.stringify([...removidas])); } catch (e) {}
+  marcarAjustadas(); contarGrade();
+}
+function mostrarVisao(v) {
+  visao = v;
+  $("verFoto").classList.toggle("ativa", v === "foto");
+  $("verGrade").classList.toggle("ativa", v === "grade");
+  $("grade").style.display = v === "grade" ? "" : "none";
+  $("gradeBarra").style.display = v === "grade" ? "" : "none";
+  $("palco").style.display = v === "grade" ? "none" : "";
+  $("amostras").style.display = v === "grade" ? "none" : "";
+  if (v === "grade") montarGrade();
+  else { const img = [...document.querySelectorAll("#amostras img")].find(i => decodeURIComponent(i.dataset.caminho) === fotoAtual);
+         if (img) selecionar(img); }
+}
+function filtradas() {
+  const f = $("filtroGrade").value;
+  return todasFotos.filter(x => f === "todas" || (f === "removidas") === removidas.has(x.caminho));
+}
+function montarGrade() {
+  const lista = filtradas();
+  $("grade").innerHTML = lista.map(x => `<div class="cel${removidas.has(x.caminho) ? " removida" : ""}${porFoto[x.caminho] ? " ajustada" : ""}${selecionadas.has(x.caminho) ? " sel" : ""}${x.caminho === fotoAtual ? " atual" : ""}"
+      data-caminho="${encodeURIComponent(x.caminho)}" title="${esc(x.nome)}">
+      <img loading="lazy" src="/api/miniatura?caminho=${encodeURIComponent(x.caminho)}&lado=360">
+      <small>${esc(x.nome)}</small></div>`).join("") ||
+    `<span class="info">${todasFotos.length ? "Nenhuma foto neste filtro" : "Carregue as fotos do evento"}</span>`;
+  contarGrade();
+}
+function contarGrade() {
+  if (!$("contaGrade")) return;
+  const n = todasFotos.length, r = [...removidas].filter(c => todasFotos.some(x => x.caminho === c)).length;
+  $("contaGrade").textContent = n ? `${n - r} de ${n} fotos vão para a entrega` +
+    (selecionadas.size ? ` · ${selecionadas.size} selecionada${selecionadas.size > 1 ? "s" : ""}` : "") : "";
+}
+function atualizarCelulas() {
+  document.querySelectorAll("#grade .cel").forEach(cel => {
+    const c = decodeURIComponent(cel.dataset.caminho);
+    cel.classList.toggle("sel", selecionadas.has(c));
+    cel.classList.toggle("removida", removidas.has(c));
+    cel.classList.toggle("atual", c === fotoAtual);
+  });
+  contarGrade();
+}
+function removerSelecionadas(remover) {
+  const alvo = selecionadas.size ? [...selecionadas] : (fotoAtual ? [fotoAtual] : []);
+  if (!alvo.length) { aviso("Selecione as fotos na grade (Ctrl ou Shift para várias)"); return; }
+  alvo.forEach(c => remover ? removidas.add(c) : removidas.delete(c));
+  guardarRemovidas();
+  if ($("filtroGrade").value !== "todas") { selecionadas.clear(); montarGrade(); } else atualizarCelulas();
+  aviso(remover ? `${alvo.length} foto${alvo.length > 1 ? "s" : ""} fora da entrega (o arquivo original não é apagado)`
+                : `${alvo.length} foto${alvo.length > 1 ? "s" : ""} de volta na entrega`);
+}
+document.addEventListener("click", e => {
+  const cel = e.target.closest && e.target.closest("#grade .cel");
+  if (!cel) return;
+  const c = decodeURIComponent(cel.dataset.caminho);
+  const lista = filtradas().map(x => x.caminho);
+  if (e.shiftKey && ultimaClicada) {
+    const [a, b] = [lista.indexOf(ultimaClicada), lista.indexOf(c)].sort((x, y) => x - y);
+    lista.slice(a, b + 1).forEach(x => selecionadas.add(x));
+  } else if (e.ctrlKey || e.metaKey) {
+    selecionadas.has(c) ? selecionadas.delete(c) : selecionadas.add(c);
+  } else {
+    selecionadas = new Set([c]);
+  }
+  ultimaClicada = c; fotoAtual = c;
+  atualizarCelulas();
+});
+document.addEventListener("dblclick", e => {
+  const cel = e.target.closest && e.target.closest("#grade .cel");
+  if (!cel) return;
+  fotoAtual = decodeURIComponent(cel.dataset.caminho);
+  mostrarVisao("foto");
+});
+function tamanhoGrade() { $("grade").style.setProperty("--tam-grade", $("tamGrade").value + "px"); }
+
 // Antes/Depois: por padrão a foto aparece INTEIRA (editada); o botão liga a comparação
 let modoComparar = false;
 function alternarComparar() {
@@ -805,8 +893,23 @@ async function atualizarPrevia() {
 document.addEventListener("keydown", e => {
   if (["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName) &&
       document.activeElement.type !== "range") return;
+  if (visao === "grade" && ["ArrowRight", "ArrowLeft"].includes(e.key)) {
+    const lista = filtradas().map(x => x.caminho);
+    const i = Math.max(0, Math.min(lista.length - 1, lista.indexOf(fotoAtual) + (e.key === "ArrowRight" ? 1 : -1)));
+    if (lista[i]) { fotoAtual = ultimaClicada = lista[i]; selecionadas = new Set([lista[i]]); atualizarCelulas();
+      document.querySelector("#grade .cel.atual")?.scrollIntoView({block: "nearest"}); }
+    e.preventDefault(); return;
+  }
+  if (e.key === "Enter" && visao === "grade") { mostrarVisao("foto"); return; }
   if (e.key === "ArrowRight") { trocarFoto(1); e.preventDefault(); }
   if (e.key === "c" || e.key === "C") alternarComparar();
+  if (e.key === "g" || e.key === "G") mostrarVisao("grade");
+  if (e.key === "e" || e.key === "E") mostrarVisao("foto");
+  if (e.key === "x" || e.key === "X" || e.key === "Delete") { removerSelecionadas(true); e.preventDefault(); }
+  if (e.key === "u" || e.key === "U") removerSelecionadas(false);
+  if (e.ctrlKey && (e.key === "a" || e.key === "A") && visao === "grade") {
+    filtradas().forEach(x => selecionadas.add(x.caminho)); atualizarCelulas(); e.preventDefault();
+  }
   if (e.key === "ArrowLeft") { trocarFoto(-1); e.preventDefault(); }
   if (e.code === "Space" && $("comparar")) { $("comparar").classList.add("so-antes"); e.preventDefault(); }
 });
@@ -825,6 +928,7 @@ async function processar() {
     ajustes: {...ajustes, lut: $("lut").value.trim() || null, por_foto: porFoto},
     opcoes: {
       renomear: $("renomear").checked, prefixo: $("prefixo").value.trim(),
+      excluir: [...removidas],
       qualidade: +$("qualidade").value, versao_web: $("versao_web").checked,
       separar_desfocadas: $("separar_desfocadas").checked, ajuste_horario: ajusteHorario,
     },

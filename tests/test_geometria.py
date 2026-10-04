@@ -65,3 +65,13 @@ def test_exif_sem_rotacao():
     lido = Image.Exif()
     lido.load(novo)
     assert lido[0x0112] == 1 and lido[0x0110] == "Canon"
+
+
+def test_proporcao_9_16_e_sempre_em_pe():
+    from editalote.geometria import aplicar_geometria
+
+    deitada = Image.new("RGB", (1600, 900))
+    c = aplicar_geometria(deitada, {"proporcao": "9:16"})
+    assert abs(c.size[0] / c.size[1] - 9 / 16) < 0.01 and c.size[1] == 900
+    c = aplicar_geometria(Image.new("RGB", (900, 1600)), {"proporcao": "16:9"})
+    assert abs(c.size[0] / c.size[1] - 16 / 9) < 0.01

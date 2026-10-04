@@ -38,14 +38,11 @@ def corte_valido(corte) -> list[float] | None:
 
 
 def razao_da_proporcao(proporcao, largura: int, altura: int) -> float | None:
-    """'4:5' -> largura/altura do corte, virada para combinar com a foto (em pé ou deitada)."""
+    """'9:16' -> largura/altura do corte, exatamente como escolhido (9:16 é sempre em pé)."""
     if not proporcao or proporcao in ("original", "livre") or ":" not in str(proporcao):
         return None
     a, b = (float(x) for x in str(proporcao).split(":"))
-    r = a / b
-    if (r > 1) != (largura > altura) and abs(r - 1) > 1e-6:
-        r = 1 / r
-    return r
+    return a / b if a > 0 and b > 0 else None
 
 
 def corte_por_proporcao(tamanho, proporcao) -> list[float] | None:

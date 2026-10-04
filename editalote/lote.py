@@ -168,6 +168,7 @@ class Trabalho:
     inicio: float = 0.0
     fim: float = 0.0
     desfocadas: int = 0
+    removidas: int = 0
     _cancelar: threading.Event = field(default_factory=threading.Event)
 
     def status(self) -> dict:
@@ -202,7 +203,12 @@ class Trabalho:
         if ajustes.get("lut") and not os.path.isfile(ajustes["lut"]):
             raise FileNotFoundError(f"LUT não encontrada: {ajustes['lut']}")
 
-        plano = planejar(listar_jpegs(entrada, ignorar=saida), opcoes)
+        from .processamento import chave_foto
+
+        removidas = {chave_foto(c) for c in (opcoes.get("excluir") or [])}
+        fotos = [c for c in listar_jpegs(entrada, ignorar=saida) if chave_foto(c) not in removidas]
+        self.removidas = len(removidas)
+        plano = planejar(fotos, opcoes)
         self.total = len(plano)
         if not plano:
             raise ValueError("Nenhuma foto JPEG encontrada na pasta")

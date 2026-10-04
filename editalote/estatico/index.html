@@ -81,6 +81,24 @@
 
   <!-- ====================================================== centro: foto -->
   <main class="centro">
+    <div class="visoes" id="visoes">
+      <div class="seg seg-pequeno">
+        <button id="verFoto" class="ativa" onclick="mostrarVisao('foto')" title="Uma foto grande (tecla E)">▣ Foto</button>
+        <button id="verGrade" onclick="mostrarVisao('grade')" title="Várias fotos em grade (tecla G)">▦ Grade</button>
+      </div>
+      <div class="grade-barra" id="gradeBarra" style="display:none">
+        <select id="filtroGrade" onchange="montarGrade()">
+          <option value="todas">Todas</option>
+          <option value="mantidas">Só as que vão</option>
+          <option value="removidas">Só as removidas</option>
+        </select>
+        <input type="range" id="tamGrade" min="110" max="320" value="170" oninput="tamanhoGrade()" title="Tamanho das miniaturas">
+        <button class="contorno" onclick="removerSelecionadas(true)" title="Tecla X">✕ Remover</button>
+        <button class="fantasma" onclick="removerSelecionadas(false)" title="Tecla U">↺ Voltar</button>
+        <small id="contaGrade" class="dica"></small>
+      </div>
+    </div>
+    <div class="grade" id="grade" style="display:none"></div>
     <div class="palco" id="palco">
       <div class="vazio">
         <img src="/estatico/marca/logo.png" alt="">
@@ -200,10 +218,12 @@
         <option value="livre">Livre</option>
         <option value="1:1">1 : 1 (quadrado)</option>
         <option value="4:5">4 : 5 (Instagram)</option>
-        <option value="2:3">2 : 3 (10x15)</option>
+        <option value="2:3">2 : 3 (10x15 em pé)</option>
+        <option value="3:2">3 : 2 (10x15 deitada)</option>
         <option value="3:4">3 : 4</option>
-        <option value="5:7">5 : 7 (13x18)</option>
-        <option value="4:6">4 : 6</option>
+        <option value="5:7">5 : 7 (13x18 em pé)</option>
+        <option value="7:5">7 : 5 (13x18 deitada)</option>
+        <option value="5:4">5 : 4 (deitada)</option>
         <option value="9:16">9 : 16 (Stories)</option>
         <option value="16:9">16 : 9</option>
       </select>
