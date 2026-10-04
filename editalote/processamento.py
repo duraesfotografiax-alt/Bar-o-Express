@@ -36,6 +36,7 @@ AJUSTES_PADRAO: dict = {
     "perspectiva_h": 0,          # -100..100
     "corte": None,               # [x0, y0, x1, y1] em 0..1, depois da geometria
     "proporcao": "original",     # só para a tela: proporção travada do corte
+    "remover": None,             # traços do pincel "Remover objeto" (ver remover.py)
     "auto_exposicao": 0.7,       # 0 = desligado, 1 = corrige tudo
     "auto_balanco_branco": 0.4,  # 0 = desligado, 1 = neutro total
     "exposicao": 0.0,            # em EV (stops), -2..2
@@ -85,7 +86,7 @@ for _cor, _ in CORES_HSL:
 CAMPOS_POR_CAMERA = ("exposicao", "temperatura", "matiz", "saturacao")
 
 
-CAMPOS_ANULAVEIS = ("corte", "lut", "curva", "curva_r", "curva_g", "curva_b", "curva_ref", "estilo_ia",
+CAMPOS_ANULAVEIS = ("remover", "corte", "lut", "curva", "curva_r", "curva_g", "curva_b", "curva_ref", "estilo_ia",
                     "curva_par_r", "curva_par_g", "curva_par_b")
 
 
@@ -443,6 +444,10 @@ def aplicar(img: Image.Image, ajustes: dict, analise: Analise | None,
         img = img.convert("RGB")
     from .geometria import aplicar_geometria, tem_geometria
 
+    if ajustes.get("remover"):   # na foto em pé, antes do corte/giro
+        from .remover import remover_objetos
+
+        img = remover_objetos(img, ajustes["remover"])
     if tem_geometria(ajustes):   # corta antes: a cor é aplicada só no que fica
         img = aplicar_geometria(img, ajustes, sem_corte=bool(ajustes.get("_sem_corte")))
     saida = img.filter(montar_lut(ajustes, analise, lut, tamanho_lut))

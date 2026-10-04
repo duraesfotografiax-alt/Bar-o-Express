@@ -114,6 +114,7 @@ function abrirAba(btn) {
   const antes = abaAtual;
   abaAtual = btn.dataset.aba;
   if ((antes === "corte") !== (abaAtual === "corte")) { mostrarCorte(); mudou(); }
+  if ((antes === "retoque") !== (abaAtual === "retoque")) { mostrarPincel(); mudou(); }
   document.querySelectorAll("#abas button").forEach(b => b.classList.toggle("ativa", b === btn));
   document.querySelectorAll(".aba").forEach(a => a.classList.toggle("ativa", a.dataset.aba === btn.dataset.aba));
   if (btn.dataset.aba === "curvas") desenharCurva();
@@ -537,7 +538,8 @@ function selecionar(img) {
       title="Liga/desliga a comparação antes e depois (tecla C)">◧ Antes / Depois</button>
     <div class="chip-ia" id="chipIA"></div>
     <div class="carregando" id="carregando"></div>`;
-  $("imgAntes").onload = () => { posicionar(modoComparar && abaAtual !== "corte" ? 0.5 : 0); mostrarCorte(); };
+  $("imgAntes").onload = () => { posicionar(modoComparar && !["corte", "retoque"].includes(abaAtual) ? 0.5 : 0);
+                                 mostrarCorte(); mostrarPincel(); };
   $("comparar").classList.toggle("inteira", !modoComparar);
   ligarArraste();
   ajustesMostrados = null;
@@ -726,6 +728,70 @@ function ligarCorte(caixa) {
   caixa.addEventListener("pointercancel", soltar);
 }
 
+// ------------------------------------------------------------------ retoque (remover objeto)
+function mostrarPincel() {
+  const c = $("comparar");
+  if (!c) return;
+  let tela = $("pincelTela");
+  const ativo = abaAtual === "retoque";
+  c.classList.toggle("pintando", ativo);
+  if (!ativo) { if (tela) tela.remove(); return; }
+  posicionar(0);
+  if (!tela) {
+    tela = document.createElement("canvas");
+    tela.id = "pincelTela"; tela.className = "pincel-tela";
+    c.appendChild(tela);
+    ligarPincel(tela);
+  }
+  desenharTracos();
+}
+function desenharTracos(extra) {
+  const tela = $("pincelTela"), img = $("imgAntes");
+  if (!tela || !img) return;
+  tela.width = img.clientWidth; tela.height = img.clientHeight;
+  const ctx = tela.getContext("2d"), W = tela.width, H = tela.height, M = Math.max(W, H);
+  ctx.clearRect(0, 0, W, H);
+  const tracos = [...(efetivos().remover || []), ...(extra ? [extra] : [])];
+  ctx.strokeStyle = ctx.fillStyle = extra ? "rgba(240,138,36,.55)" : "rgba(240,138,36,.18)";
+  for (const t of tracos) {
+    ctx.lineWidth = 2 * t.r * M; ctx.lineCap = ctx.lineJoin = "round";
+    ctx.beginPath();
+    t.p.forEach(([x, y], i) => i ? ctx.lineTo(x * W, y * H) : ctx.moveTo(x * W, y * H));
+    if (t.p.length === 1) { ctx.arc(t.p[0][0] * W, t.p[0][1] * H, t.r * M, 0, 7); ctx.fill(); } else ctx.stroke();
+  }
+}
+function ligarPincel(tela) {
+  let traco = null;
+  const ponto = e => { const r = tela.getBoundingClientRect();
+    return [+((e.clientX - r.left) / r.width).toFixed(4), +((e.clientY - r.top) / r.height).toFixed(4)]; };
+  tela.addEventListener("pointerdown", e => {
+    e.stopPropagation(); e.preventDefault(); tela.setPointerCapture(e.pointerId);
+    traco = {p: [ponto(e)], r: +$("pincel").value / 100};
+    desenharTracos(traco);
+  });
+  tela.addEventListener("pointermove", e => {
+    if (!traco) return;
+    const p = ponto(e), u = traco.p[traco.p.length - 1];
+    if (Math.hypot(p[0] - u[0], p[1] - u[1]) > traco.r * 0.3) { traco.p.push(p); desenharTracos(traco); }
+  });
+  const soltar = () => {
+    if (!traco) return;
+    definir("remover", [...(efetivos().remover || []), traco]);
+    traco = null;
+    $("statusRemover").textContent = "Removendo… (objetos grandes levam alguns segundos)";
+    desenharTracos(); mudou(); marcarAjustadas();
+  };
+  tela.addEventListener("pointerup", soltar);
+  tela.addEventListener("pointercancel", soltar);
+}
+function desfazerTraco() {
+  const t = efetivos().remover || [];
+  if (!t.length) return;
+  definir("remover", t.length > 1 ? t.slice(0, -1) : null);
+  desenharTracos(); mudou();
+}
+function limparTracos() { definir("remover", null); desenharTracos(); mudou(); }
+
 // ------------------------------------------------------------------ grade e seleção
 // Fotos "removidas" não são apagadas do disco: só ficam fora da exportação.
 let todasFotos = [], removidas = new Set(), selecionadas = new Set(), visao = "foto", ultimaClicada = null;
@@ -862,7 +928,10 @@ async function atualizarPrevia() {
   if (!fotoAtual) return;
   const alvo = fotoAtual;
   $("carregando") && ($("carregando").style.display = "block");
-  const pedidos = structuredClone(efetivos());
+  let pedidos = structuredClone(efetivos());
+  if (abaAtual === "retoque")   // o pincel trabalha na foto inteira, sem corte/giro
+    pedidos = {...pedidos, girar: 0, espelhar: 0, endireitar: 0, perspectiva_v: 0, perspectiva_h: 0,
+               corte: null, proporcao: "original"};
   const semCorte = abaAtual === "corte";
   atualizarAntes(alvo, pedidos, semCorte);
   const r = await fetch("/api/previa", {method: "POST", headers: {"Content-Type": "application/json"},
@@ -881,6 +950,7 @@ async function atualizarPrevia() {
     d.onload = d.onerror = () => {
       if (velho) URL.revokeObjectURL(velho);
       ajustesMostrados = enviados;
+      if ($("statusRemover")) $("statusRemover").textContent = "";
       filtroInstantaneo();          // só sobra filtro se o controle mudou de novo nesse meio tempo
       posicionar(modoComparar && abaAtual !== "corte" ? (+$("comparar").dataset.f || 0.5) : 0);
       pronto();

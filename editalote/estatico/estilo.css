@@ -162,7 +162,7 @@ input[type=range]::-moz-range-thumb { width: 10px; height: 10px; border-radius: 
   animation: brilho 2.5s linear infinite; }
 @keyframes brilho { to { background-position: -200% 0; } }
 
-.abas { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; background: var(--painel);
+.abas { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; background: var(--painel);
   border: 1px solid var(--borda); border-radius: 10px; padding: 4px; margin: 10px 0 6px; position: sticky; top: -14px; z-index: 2; }
 .abas button { background: transparent; border: 0; color: var(--suave); padding: 7px 4px; font-size: 12px; }
 .abas button.ativa { background: var(--painel-3); color: var(--texto); box-shadow: inset 0 -2px 0 var(--laranja); }
@@ -319,3 +319,7 @@ kbd { font: 600 10.5px "Montserrat"; background: var(--painel-3); border: 1px so
   font: 700 18px "Montserrat"; }
 .grade .cel.ajustada small { box-shadow: inset 0 -2px 0 var(--laranja); }
 .tira img.removida { opacity: .2; filter: grayscale(1); }
+
+/* ---------------------------------------------------------------- retoque */
+.pincel-tela { position: absolute; inset: 0; z-index: 4; cursor: crosshair; touch-action: none; }
+.comparar.pintando .alca, .comparar.pintando .rotulo { display: none; }

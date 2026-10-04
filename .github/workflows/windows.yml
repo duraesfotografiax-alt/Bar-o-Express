@@ -31,6 +31,27 @@ jobs:
           name: modelo-lama
           path: modelo
           retention-days: 30
+      - uses: actions/checkout@v4
+        with:
+          path: codigo
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Testar o Remover objeto com o modelo
+        working-directory: codigo
+        env:
+          DURAES_MODELO_LAMA: ${{ github.workspace }}/modelo/lama_fp32.onnx
+        run: |
+          pip install -q -r requirements.txt
+          python scripts/testar_remover.py | tee resultados_log.txt
+      - name: Guardar o resultado do teste (branch ci-resultados)
+        working-directory: codigo
+        run: |
+          mkdir -p /tmp/res && cp resultados/* resultados_log.txt /tmp/res/
+          git config user.name "ci" && git config user.email "ci@users.noreply.github.com"
+          git checkout --orphan ci-resultados && git rm -rfq . && cp /tmp/res/* . 
+          git add -A && git commit -qm "resultado do teste do Remover objeto (${GITHUB_SHA::7})"
+          git push -f origin ci-resultados
 
   windows:
     runs-on: windows-latest

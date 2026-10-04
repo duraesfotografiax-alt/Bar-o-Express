@@ -177,6 +177,7 @@
       <button data-aba="curvas" onclick="abrirAba(this)">Curvas</button>
       <button data-aba="detalhes" onclick="abrirAba(this)">Detalhes</button>
       <button data-aba="corte" onclick="abrirAba(this)">Corte</button>
+      <button data-aba="retoque" onclick="abrirAba(this)">Retoque</button>
     </div>
 
     <div class="aba ativa" data-aba="basico">
@@ -237,6 +238,18 @@
       <p class="dica">Arraste o quadro em cima da foto para cortar (cantos mudam o tamanho, o meio move).
         A proporção escolhida fica travada. Com <b>Todas as fotos</b> ligado, a proporção vale para o
         evento inteiro (corte centralizado em cada foto).</p>
+    </div>
+    <div class="aba" data-aba="retoque">
+      <h4>Remover objeto</h4>
+      <p class="dica">Pinte por cima do que quer tirar (copo, fio, pessoa ao fundo, interruptor). Ao soltar,
+        a IA preenche com o que está em volta. Pode pintar várias vezes.</p>
+      <div class="slider"><span>Tamanho do pincel</span>
+        <input type="range" id="pincel" min="0.5" max="12" step="0.5" value="3" oninput="$('o_pincel').value=this.value"><output id="o_pincel">3</output></div>
+      <div class="linha geo-botoes">
+        <button onclick="desfazerTraco()">↶ Desfazer</button>
+        <button class="fantasma" onclick="limparTracos()">Limpar tudo</button>
+      </div>
+      <p class="dica" id="statusRemover"></p>
     </div>
     <div class="aba" data-aba="detalhes">
       <h4>Presença</h4><div id="slidersDetalhe"></div>
