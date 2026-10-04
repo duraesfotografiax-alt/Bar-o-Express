@@ -9,6 +9,8 @@ from datetime import datetime
 from PIL import Image
 
 EXTENSOES = {".jpg", ".jpeg"}
+# vídeos da entrega (vão para o Drive como estão, sem edição)
+EXTENSOES_VIDEO = {".mp4", ".mov", ".m4v", ".avi", ".mts", ".m2ts", ".mkv", ".wmv", ".3gp", ".mpg", ".mpeg"}
 
 _TAG_MARCA = 0x010F
 _TAG_MODELO = 0x0110

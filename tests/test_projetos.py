@@ -58,6 +58,15 @@ class DriveFalso:
             meta = self.sessoes[url]  # como no Google, a sessão aceita nova tentativa
             if meta["name"] in self.falhar_nomes:
                 return 500, {}, b"{}"
+            faixa = (cabecalhos or {}).get("Content-Range")
+            if faixa:  # envio em partes (vídeo): guarda e responde 308 até a última
+                inicio_fim, total = faixa.split(" ")[1].split("/")
+                recebido = meta.setdefault("_recebido", b"") + corpo
+                meta["_recebido"] = recebido
+                if len(recebido) < int(total):
+                    return 308, {"Range": f"bytes=0-{len(recebido) - 1}"}, b""
+                corpo = recebido
+                meta.pop("_recebido")
             del self.sessoes[url]
             fid = self._novo_id()
             self.arquivos[fid] = {**meta, "trashed": False, "tamanho": len(corpo)}
@@ -229,3 +238,16 @@ def test_rotas_do_servidor(ambiente, monkeypatch):
     assert len(cliente.get("/api/projetos").json) == 1
     assert cliente.post("/api/abrir-link", json={"url": "https://exemplo.com"}).status_code == 400
     assert cliente.post("/api/abrir-link", json={"url": "https://wa.me/?text=oi"}).status_code == 200
+
+
+def test_videos_tambem_vao_para_o_drive_em_partes(ambiente, monkeypatch):
+    pj, falso, fotos = ambiente
+    monkeypatch.setattr(drive_mod, "PARTE", 256 * 1024)
+    video = bytes(range(256)) * 4000          # ~1 MB: sobe em 4 partes
+    (fotos / "Video_Cerimonia.MP4").write_bytes(video)
+    projeto = pj.criar("Casamento Ana e João", str(fotos))
+    assert projeto["total"] == 8
+    pj.enviar(projeto["id"])
+    assert esperar(pj)["estado"] == "concluido"
+    enviados = {a["name"]: a for a in falso.fotos_em(pj.obter(projeto["id"])["drive_pasta"])}
+    assert enviados["Video_Cerimonia.MP4"]["tamanho"] == len(video)

@@ -21,7 +21,7 @@ from datetime import datetime
 from PIL import Image
 
 from .drive import Drive, ErroDrive, ler_cliente, salvar_json
-from .metadados import EXTENSOES
+from .metadados import EXTENSOES, EXTENSOES_VIDEO
 
 log = logging.getLogger("editalote.projetos")
 
@@ -40,13 +40,18 @@ def _ler(caminho: str, padrao):
         return padrao
 
 
+def eh_video(caminho: str) -> bool:
+    return os.path.splitext(caminho)[1].lower() in EXTENSOES_VIDEO
+
+
 def fotos_da_pasta(pasta: str) -> list[str]:
-    """Fotos para entregar: as da pasta (e subpastas), menos as de revisão e a versão web."""
+    """Fotos e vídeos para entregar: os da pasta (e subpastas), menos os de revisão e a versão web."""
     fotos = []
     for raiz, dirs, nomes in os.walk(pasta):
         dirs[:] = sorted(d for d in dirs if d not in IGNORAR_PASTAS)
         fotos += [os.path.join(raiz, n) for n in sorted(nomes)
-                  if os.path.splitext(n)[1].lower() in EXTENSOES and not n.startswith(".")]
+                  if os.path.splitext(n)[1].lower() in EXTENSOES | EXTENSOES_VIDEO
+                  and not n.startswith(".")]
     return fotos
 
 
@@ -144,7 +149,7 @@ class Projetos:
         if not os.path.isdir(pasta):
             raise ValueError("Pasta das fotos não encontrada")
         if not fotos_da_pasta(pasta):
-            raise ValueError("Não há fotos JPEG nessa pasta")
+            raise ValueError("Não há fotos JPEG nem vídeos nessa pasta")
         projeto = {
             "id": secrets.token_hex(4), "nome": nome, "pasta": pasta,
             "tamanho": "leve" if tamanho == "leve" else "original",
@@ -247,16 +252,20 @@ class Envio:
         self.total = len(fotos)
         self.feitas = self.total - len(faltam)
         pj._atualizar(self.pid, total=self.total)
-        self.mensagem = "Enviando fotos para o Drive…"
+        self.mensagem = "Enviando fotos e vídeos para o Drive…"
 
         def enviar_uma(caminho: str):
             if self.cancelar.is_set():
                 return caminho, "cancelado"
             try:
                 atual = pj.obter(self.pid)
-                dados = bytes_para_envio(caminho, atual["tamanho"])
-                drive.enviar_foto(os.path.basename(caminho), dados, atual["drive_pasta"],
-                                  atual["permitir_download"])
+                if eh_video(caminho):   # vídeo vai como está, lido do disco em partes
+                    drive.enviar_arquivo(os.path.basename(caminho), atual["drive_pasta"],
+                                         atual["permitir_download"], caminho=caminho)
+                else:
+                    dados = bytes_para_envio(caminho, atual["tamanho"])
+                    drive.enviar_foto(os.path.basename(caminho), dados, atual["drive_pasta"],
+                                      atual["permitir_download"])
                 return caminho, None
             except (ErroDrive, OSError) as erro:
                 return caminho, str(erro)
@@ -276,6 +285,6 @@ class Envio:
         if self.cancelar.is_set():
             self.estado, self.mensagem = "cancelado", f"Envio pausado: {self.feitas} de {self.total}. Clique em Enviar para continuar."
         elif self.erros:
-            self.estado, self.mensagem = "erro", f"{len(self.erros)} fotos não foram enviadas. Clique em Enviar para tentar de novo."
+            self.estado, self.mensagem = "erro", f"{len(self.erros)} arquivos não foram enviados. Clique em Enviar para tentar de novo."
         else:
-            self.estado, self.mensagem = "concluido", f"{self.total} fotos no Drive. Link pronto para o cliente."
+            self.estado, self.mensagem = "concluido", f"{self.total} arquivos (fotos e vídeos) no Drive. Link pronto para o cliente."

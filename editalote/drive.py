@@ -13,6 +13,7 @@ import base64
 import hashlib
 import json
 import logging
+import mimetypes
 import os
 import secrets
 import time
@@ -28,6 +29,7 @@ URL_TOKEN = "https://oauth2.googleapis.com/token"
 API = "https://www.googleapis.com/drive/v3"
 UPLOAD = "https://www.googleapis.com/upload/drive/v3/files"
 PASTA_MIME = "application/vnd.google-apps.folder"
+PARTE = 16 * 1024 * 1024  # vídeos sobem em partes de 16 MB (múltiplo de 256 KB, como o Google exige)
 ESPERA_INICIAL = 1.0  # segundos antes de tentar de novo quando o Google está instável (dobra a cada vez)
 
 
@@ -201,19 +203,52 @@ class Drive:
 
     # -- envio
     def enviar_foto(self, nome: str, dados: bytes, pasta_id: str, permitir: bool) -> str:
+        return self.enviar_arquivo(nome, pasta_id, permitir, dados=dados)
+
+    def enviar_arquivo(self, nome: str, pasta_id: str, permitir: bool, dados: bytes | None = None,
+                       caminho: str | None = None) -> str:
+        """Envia uma foto (dados na memória) ou um arquivo do disco (vídeo de vários GB) em partes."""
+        tipo = mimetypes.guess_type(nome)[0] or "application/octet-stream"
+        if nome.lower().endswith((".mts", ".m2ts")):
+            tipo = "video/mp2t"
+        tamanho = len(dados) if dados is not None else os.path.getsize(caminho)
         meta = json.dumps({"name": nome, "parents": [pasta_id],
                            "copyRequiresWriterPermission": not permitir}).encode()
         status, cab, resposta = self._chamar(
             "POST", f"{UPLOAD}?uploadType=resumable&fields=id",
-            {"Content-Type": "application/json; charset=UTF-8", "X-Upload-Content-Type": "image/jpeg",
-             "X-Upload-Content-Length": str(len(dados))}, meta)
+            {"Content-Type": "application/json; charset=UTF-8", "X-Upload-Content-Type": tipo,
+             "X-Upload-Content-Length": str(tamanho)}, meta)
         destino = cab.get("Location") or cab.get("location")
         if status != 200 or not destino:
             raise ErroDrive(f"Não consegui iniciar o envio de {nome} ({status})")
-        status, _, resposta = self._chamar("PUT", destino, {"Content-Type": "image/jpeg"}, dados)
-        if status not in (200, 201):
-            raise ErroDrive(f"Falha ao enviar {nome} ({status})")
-        return json.loads(resposta)["id"]
+        if dados is not None and tamanho <= PARTE:
+            status, _, resposta = self._chamar("PUT", destino, {"Content-Type": tipo}, dados)
+            if status not in (200, 201):
+                raise ErroDrive(f"Falha ao enviar {nome} ({status})")
+            return json.loads(resposta)["id"]
+        arquivo = open(caminho, "rb") if dados is None else None
+        try:
+            inicio = 0
+            while True:
+                if arquivo is not None:
+                    arquivo.seek(inicio)
+                    parte = arquivo.read(PARTE)
+                else:
+                    parte = dados[inicio:inicio + PARTE]
+                fim = inicio + len(parte) - 1
+                faixa = f"bytes {inicio}-{fim}/{tamanho}" if parte else f"bytes */{tamanho}"
+                status, cab, resposta = self._chamar(
+                    "PUT", destino, {"Content-Type": tipo, "Content-Range": faixa}, parte)
+                if status in (200, 201):
+                    return json.loads(resposta)["id"]
+                if status != 308:
+                    raise ErroDrive(f"Falha ao enviar {nome} ({status})")
+                # 308 = parte recebida; o Google diz até onde já tem (continua dali)
+                recebido = cab.get("Range") or cab.get("range") or ""
+                inicio = int(recebido.rsplit("-", 1)[1]) + 1 if recebido else 0
+        finally:
+            if arquivo is not None:
+                arquivo.close()
 
 
 def salvar_json(caminho: str, dados: dict):
