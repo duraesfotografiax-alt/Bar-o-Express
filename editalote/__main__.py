@@ -55,7 +55,7 @@ def main(argv=None):
     aprender = sub.add_parser("aprender", help="treina a IA de estilo com uma pasta do Lightroom")
     aprender.add_argument("pasta", help="pasta exportada: Original + configurações")
     aprender.add_argument("--nome", default="Estilo Durães")
-    aprender.add_argument("--modo", choices=["pares", "referencia", "lightroom"], default="referencia",
+    aprender.add_argument("--modo", choices=["pares", "referencia", "lightroom", "tipos"], default="referencia",
                           help="pares = originais + finais; referencia = só finais; lightroom = originais + configurações")
     aprender.add_argument("--finais", default="", help="no modo pares: pasta das fotos finais")
     proc = sub.add_parser("processar", help="processa uma pasta direto pelo terminal")
@@ -81,6 +81,13 @@ def main(argv=None):
         from .servidor import PASTA_PRESETS, RAIZ, _nome_arquivo
 
         configurar_log(RAIZ)
+        if args.modo == "tipos":
+            from .servidor import Treino
+
+            treino = Treino(args.pasta, "" if args.nome == "Estilo Durães" else args.nome, "tipos")
+            treino.executar()
+            print(treino.resultado["diagnostico"] if treino.resultado else treino.erro)
+            return 0 if treino.estado == "concluido" else 2
         try:
             r = treinar_e_salvar(args.pasta, args.nome, PASTA_PRESETS, _nome_arquivo(args.nome, "estilo"),
                                  modo=args.modo, pasta_finais=args.finais)

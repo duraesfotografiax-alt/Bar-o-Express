@@ -88,6 +88,13 @@ pouco mais fortes que o padrão).
 centro) e mede a exposição por elas, não pelo fundo escuro da festa. O controle **Realçar pessoas**
 (aba Básico, 0 a 100) clareia e destaca as pessoas, levando junto um pouco do cenário.
 
+**Um preset para cada tipo de evento (pasta do Drive):** em **Aprender com**, escolha **Todos os
+tipos de evento de uma vez** e aponte para a pasta principal das entregas, com uma subpasta por tipo
+(Casamento, Aniversário, Ensaio...). A IA estuda até 200 fotos de cada tipo, divididas por igual
+entre os eventos, e cria **✦ Durães · Casamento**, **✦ Durães · Aniversário** etc. Com o
+**Google Drive para computador** instalado, a pasta do Drive (ex.: `G:\Meu Drive\Entregas`) pode
+ser usada direto; as fotos são baixadas na hora.
+
 Para copiar outro jeito (ex.: um cliente que quer mais claro), use **Aprender com: Copiar o jeito
 de fotos prontas** e escolha **uma** pasta com fotos já editadas: nasce um preset novo com a IA
 automática mirando nesse jeito.

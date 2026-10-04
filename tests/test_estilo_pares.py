@@ -157,3 +157,37 @@ def test_melhorar_qualidade_tira_ruido():
     assert medir_ruido(ruidosa) > 3
     melhor = np.asarray(melhorar(ruidosa, 0.8), dtype=float)
     assert np.abs(melhor - limpa).mean() < np.abs(np.asarray(ruidosa, dtype=float) - limpa).mean() * 0.75
+
+
+def test_aprende_um_preset_por_tipo_de_evento(tmp_path, monkeypatch):
+    import json
+
+    from editalote import servidor
+    from editalote.estilo_ia import amostra_de_eventos
+
+    raiz = tmp_path / "Entregas"
+    for tipo, fator, eventos in (("Casamento", 0.8, 3), ("Aniversário", 1.15, 2), ("Ensaio", 1.0, 1)):
+        for e in range(eventos):
+            pasta = raiz / tipo / f"Evento {e}"
+            (pasta / "web").mkdir(parents=True)
+            for i in range(6):
+                img = np.clip(np.asarray(cena_final(e * 10 + i), dtype=float) * fator, 0, 255)
+                Image.fromarray(img.astype(np.uint8)).save(pasta / f"F_{i}.jpg", quality=90)
+            cena_final(0).save(pasta / "web" / "ignorar.jpg")
+    (raiz / "Vazia").mkdir()
+    amostra = amostra_de_eventos(str(raiz / "Casamento"), 9)
+    assert len(amostra) == 9 and len({os.path.dirname(a) for a in amostra}) == 3   # 3 de cada evento
+    assert not any(os.sep + "web" + os.sep in a for a in amostra_de_eventos(str(raiz), 500))
+
+    monkeypatch.setattr(servidor, "PASTA_PRESETS", str(tmp_path / "presets"))
+    treino = servidor.Treino(str(raiz), "Durães", "tipos")
+    treino.executar()
+    assert treino.estado == "concluido", treino.erro
+    nomes = {c["nome"] for c in treino.resultado["criados"]}
+    assert nomes == {"Durães · Casamento", "Durães · Aniversário", "Durães · Ensaio"}
+    alvos = {}
+    for c in treino.resultado["criados"]:
+        preset = json.loads((tmp_path / "presets" / c["arquivo"]).read_text(encoding="utf-8"))
+        assert preset["auto_tom"] == 100
+        alvos[c["nome"]] = preset["auto_alvo"]["meio"]
+    assert alvos["Durães · Aniversário"] > alvos["Durães · Casamento"]   # aprendeu que é mais claro

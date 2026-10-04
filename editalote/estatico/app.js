@@ -208,6 +208,10 @@ async function salvarPreset() {
 
 // ------------------------------------------------------------------ IA de estilo
 const COMO_IA = {
+  tipos: "Escolha a pasta PRINCIPAL das entregas (ex.: G:\\Meu Drive\\Entregas), com uma subpasta para cada " +
+    "tipo de evento: Casamento, Aniversário, Ensaio... A IA estuda até 200 fotos de cada tipo, " +
+    "espalhadas por todos os eventos, e cria um preset ✦ para cada um. Com o Google Drive para computador " +
+    "dá para usar a pasta do Drive direto (as fotos são baixadas na hora; pode levar alguns minutos).",
   pares: "O jeito mais fiel: escolha a pasta das fotos ORIGINAIS de um casamento (as que saíram da câmera) " +
     "e a pasta das MESMAS fotos editadas e entregues. A IA compara cada par e aprende o contraste, a curva, " +
     "a exposição e a cor exatos de vocês. Os nomes dos arquivos precisam ser iguais nas duas pastas " +
@@ -221,10 +225,13 @@ const COMO_IA = {
 function mostrarModoIA() {
   const modo = $("iaModo").value;
   $("iaComo").textContent = COMO_IA[modo];
-  $("iaPastaRotulo").textContent = modo === "referencia" ? "Pasta com as fotos finais"
+  $("iaPastaRotulo").textContent = modo === "tipos" ? "Pasta principal (uma subpasta por tipo de evento)"
+    : modo === "referencia" ? "Pasta com as fotos finais"
     : modo === "pares" ? "Pasta das fotos originais (da câmera)"
     : "Pasta exportada do Lightroom (Original + configurações)";
   $("iaFinaisBloco").style.display = modo === "pares" ? "" : "none";
+  // no modo "todos os tipos" o nome de cada preset vem da subpasta
+  $("iaNome").style.display = $("iaNome").previousElementSibling.style.display = modo === "tipos" ? "none" : "";
 }
 async function escolherPastaFinais() {
   const p = await dialogo("pasta");
@@ -265,18 +272,20 @@ async function treinarIA() {
   if (!pasta) { statusIA("Escolha a pasta das fotos.", true); return; }
   const modo = $("iaModo").value, pastaFinais = $("iaPastaFinais").value.trim();
   if (modo === "pares" && !pastaFinais) { statusIA("Escolha também a pasta das fotos finais (entregues).", true); return; }
-  try { await api("/api/estilo/treinar", {pasta, nome: $("iaNome").value.trim() || "Estilo Durães",
+  const nome = modo === "tipos" ? "Durães" : ($("iaNome").value.trim() || "Estilo Durães");
+  try { await api("/api/estilo/treinar", {pasta, nome,
                                           modo, pasta_finais: pastaFinais}); }
   catch (e) { statusIA(e.message, true); return; }
   $("iaTreino").style.display = "none"; $("iaProgresso").style.display = "";
   $("iaBarra").style.width = "0";
-  statusIA("Procurando as fotos com edição do Lightroom…");
+  statusIA(modo === "tipos" ? "Procurando os tipos de evento…" : "Procurando as fotos…");
   const t = setInterval(async () => {
     let s;
     try { s = await api("/api/estilo/status"); } catch (e) { return; }
     if (s.total) {
       $("iaBarra").style.width = (100 * s.feitas / s.total) + "%";
-      statusIA(`Estudando as fotos: ${s.feitas} de ${s.total}`);
+      statusIA(modo === "tipos" ? `Estudando os eventos: ${Math.round(100 * s.feitas / s.total)}%`
+                                : `Estudando as fotos: ${s.feitas} de ${s.total}`);
     }
     if (s.estado === "concluido" || s.estado === "erro") {
       clearInterval(t);
@@ -285,7 +294,8 @@ async function treinarIA() {
       statusIA(s.resultado.diagnostico || "");
       await carregarPresets(s.resultado.arquivo);
       const p = s.resultado.precisao.exposicao;
-      let txt = `Aprendido de ${s.resultado.fotos} fotos.`;
+      let txt = s.resultado.modo === "tipos" ? "Escolha o preset do tipo de evento na lista (✦ Durães · ...)."
+        : `Aprendido de ${s.resultado.fotos} fotos.`;
       if (s.resultado.modo === "referencia" && s.resultado.fotos < 20)
         txt += " Para a IA acertar mais a cor e o brilho, use de 30 a 100 fotos de momentos diferentes do evento.";
       if (p) txt += ` Exposição: a IA erra em média ${num(p.erro_ia)} stop; com um ajuste fixo seriam ${num(p.erro_sem_ia)}.`;

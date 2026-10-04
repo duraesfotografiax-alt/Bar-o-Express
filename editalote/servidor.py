@@ -74,6 +74,10 @@ class Treino:
 
     def executar(self):
         try:
+            if self.modo == "tipos":
+                self.resultado = self._todos_os_tipos()
+                self.estado = "concluido"
+                return
             self.resultado = estilo_ia.treinar_e_salvar(
                 self.pasta, self.nome, PASTA_PRESETS, _nome_arquivo(self.nome, "estilo"), self.progresso,
                 modo=self.modo, pasta_finais=self.pasta_finais)
@@ -84,6 +88,32 @@ class Treino:
         except Exception as erro:
             log.exception("treino falhou")
             self.estado, self.erro = "erro", f"Erro inesperado no treino: {erro}. Detalhes em duraesapp.log."
+
+    def _todos_os_tipos(self) -> dict:
+        """Um preset de IA para cada subpasta (Casamento, Aniversário, Ensaio...)."""
+        tipos = estilo_ia.tipos_de_evento(self.pasta)
+        if not tipos:
+            raise ValueError("Não achei subpastas com fotos JPEG. Escolha a pasta principal, que tem "
+                             "uma subpasta para cada tipo de evento (ex.: Casamento, Aniversário, Ensaio).")
+        criados, falhas = [], []
+        for i, (nome, caminho) in enumerate(tipos):
+            def progresso(feitas, total, i=i):
+                self.progresso(i * 100 + int(100 * feitas / max(total, 1)), len(tipos) * 100)
+            nome_preset = f"{self.nome} · {nome}" if self.nome else nome
+            try:
+                r = estilo_ia.treinar_e_salvar(caminho, nome_preset, PASTA_PRESETS,
+                                               _nome_arquivo(nome_preset, "estilo"), progresso,
+                                               modo="referencia")
+                criados.append({"nome": nome_preset, "arquivo": r["arquivo"], "fotos": r["fotos"]})
+            except ValueError as erro:
+                falhas.append(f"{nome}: {erro}")
+        if not criados:
+            raise ValueError("Nenhum tipo de evento pôde ser aprendido. " + " ".join(falhas))
+        resumo = "; ".join(f"{c['nome']} ({c['fotos']} fotos)" for c in criados)
+        return {"arquivo": criados[0]["arquivo"], "fotos": sum(c["fotos"] for c in criados),
+                "modo": "tipos", "criados": criados, "precisao": {}, "ignorados": [],
+                "diagnostico": f"Criei {len(criados)} presets: {resumo}." +
+                               (f" Não deu em: {'; '.join(falhas)}" if falhas else "")}
 
     def status(self) -> dict:
         return {"estado": self.estado, "feitas": self.feitas, "total": self.total,
@@ -101,7 +131,7 @@ def treinar_estilo():
         return jsonify({"erro": "Pasta não encontrada"}), 400
     if _treino and _treino.estado in ("lendo", "treinando"):
         return jsonify({"erro": "Já tem um treino em andamento"}), 409
-    modo = dados.get("modo") if dados.get("modo") in ("lightroom", "pares") else "referencia"
+    modo = dados.get("modo") if dados.get("modo") in ("lightroom", "pares", "tipos") else "referencia"
     if modo == "pares" and not os.path.isdir(dados.get("pasta_finais", "")):
         return jsonify({"erro": "Pasta das fotos finais não encontrada"}), 400
     _treino = Treino(dados["pasta"], (dados.get("nome") or "Meu estilo").strip(), modo,

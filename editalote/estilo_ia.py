@@ -244,6 +244,50 @@ def treinar(pasta: str, nome: str = "Meu estilo", limite: int = 2500,
     }
 
 
+IGNORAR_PASTAS = {"_revisar_desfocadas", "web"}
+
+
+def amostra_de_eventos(pasta: str, quantas: int) -> list[str]:
+    """Até `quantas` fotos JPEG, divididas por igual entre os eventos (subpastas) e espalhadas
+    dentro de cada evento: um casamento com 2000 fotos não abafa os outros."""
+    from .metadados import EXTENSOES
+
+    por_evento: dict[str, list[str]] = {}
+    for raiz, dirs, nomes in os.walk(pasta):
+        dirs[:] = sorted(d for d in dirs if d not in IGNORAR_PASTAS and not d.startswith("."))
+        rel = os.path.relpath(raiz, pasta)
+        evento = rel.split(os.sep)[0] if rel != "." else ""
+        por_evento.setdefault(evento, []).extend(
+            os.path.join(raiz, n) for n in sorted(nomes)
+            if os.path.splitext(n)[1].lower() in EXTENSOES and not n.startswith("."))
+    eventos = [lista for lista in por_evento.values() if lista]
+    escolhidas: list[str] = []
+    restantes = quantas
+    for i, lista in enumerate(sorted(eventos, key=len)):  # os menores primeiro: sobra vai para os maiores
+        cota = restantes // (len(eventos) - i)
+        if len(lista) > cota:
+            lista = [lista[int(j)] for j in np.linspace(0, len(lista) - 1, max(cota, 1))]
+        escolhidas += lista
+        restantes -= len(lista)
+    return escolhidas
+
+
+def tipos_de_evento(pasta: str) -> list[tuple[str, str]]:
+    """Subpastas de primeiro nível que têm fotos: (nome, caminho). Ex.: Casamento, Aniversário."""
+    from .metadados import EXTENSOES
+
+    tipos = []
+    for nome in sorted(os.listdir(pasta)):
+        caminho = os.path.join(pasta, nome)
+        if not os.path.isdir(caminho) or nome.startswith(".") or nome in IGNORAR_PASTAS:
+            continue
+        for _, _, nomes in os.walk(caminho):
+            if any(os.path.splitext(n)[1].lower() in EXTENSOES for n in nomes):
+                tipos.append((nome, caminho))
+                break
+    return tipos
+
+
 def treinar_e_salvar(pasta: str, nome: str, pasta_presets: str, arquivo: str,
                      progresso=None, modo: str = "referencia", pasta_finais: str = "") -> dict:
     """Treina e grava o modelo (presets/estilos/<arquivo>.json) e o preset que o usa.
@@ -269,12 +313,7 @@ def treinar_e_salvar(pasta: str, nome: str, pasta_presets: str, arquivo: str,
         from .auto_tom import medir_estilo
         from .metadados import EXTENSOES
 
-        arquivos = []
-        for raiz, _, nomes in os.walk(pasta):
-            arquivos += [os.path.join(raiz, n) for n in sorted(nomes)
-                         if os.path.splitext(n)[1].lower() in EXTENSOES]
-        if len(arquivos) > 200:  # 200 fotos espalhadas pelo evento bastam
-            arquivos = [arquivos[int(i)] for i in np.linspace(0, len(arquivos) - 1, 200)]
+        arquivos = amostra_de_eventos(pasta, 200)
         fotos = []
         for n, caminho in enumerate(arquivos, 1):
             try:
@@ -288,7 +327,7 @@ def treinar_e_salvar(pasta: str, nome: str, pasta_presets: str, arquivo: str,
             raise ValueError(f"{diagnostico} Escolha uma pasta com fotos JPEG prontas (editadas).")
         alvo = medir_estilo(fotos)
         preset = {"nome": nome, "auto_tom": 100, "auto_alvo": alvo, "auto_exposicao": 0,
-                  "auto_balanco_branco": 0, "nitidez": 10}
+                  "auto_balanco_branco": 0, "nitidez": 10, "realce_pessoas": 40}
         os.makedirs(pasta_presets, exist_ok=True)
         with open(os.path.join(pasta_presets, f"{arquivo}.json"), "w", encoding="utf-8") as f:
             json.dump(preset, f, ensure_ascii=False, indent=2)
