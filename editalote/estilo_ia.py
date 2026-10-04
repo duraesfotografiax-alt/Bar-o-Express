@@ -326,7 +326,10 @@ def treinar_e_salvar(pasta: str, nome: str, pasta_presets: str, arquivo: str,
         if not fotos:
             raise ValueError(f"{diagnostico} Escolha uma pasta com fotos JPEG prontas (editadas).")
         alvo = medir_estilo(fotos)
-        preset = {"nome": nome, "auto_tom": 100, "auto_alvo": alvo, "auto_exposicao": 0,
+        from .auto_tom import medir_cenas
+
+        preset = {"nome": nome, "auto_tom": 100, "auto_alvo": alvo, "auto_cenas": medir_cenas(fotos),
+                  "auto_exposicao": 0,
                   "auto_balanco_branco": 0, "nitidez": 10, "realce_pessoas": 40}
         os.makedirs(pasta_presets, exist_ok=True)
         with open(os.path.join(pasta_presets, f"{arquivo}.json"), "w", encoding="utf-8") as f:

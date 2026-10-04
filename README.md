@@ -120,6 +120,27 @@ Para fotos escuras de festa (ISO alto): mede o ruído da foto, tira as manchinha
 granulado na medida certa e realça os detalhes (cabelo, olhos, tecido) sem afiar o granulado.
 0 = desligado. Pode ser usado só numa foto (Só esta foto) ou em todas.
 
+### IA foto a foto (cenas parecidas)
+
+Os presets criados com **Copiar o jeito de fotos prontas** ou **Todos os tipos de evento** guardam,
+para cada foto pronta estudada, a "cena" (onde está a luz, cores da decoração, se tem gente, luzes
+acesas, foto em pé ou deitada) e como ela ficou. Numa foto nova, a IA procura as 10 fotos prontas
+de cena mais parecida e mira no jeito delas: salão escuro com luzes segue as fotos de salão, externa
+de dia segue as externas, mesa do bolo segue as mesas de bolo. Presets treinados antes desta versão
+precisam ser treinados de novo para ganhar isso.
+
+### Cortar, girar e geometria (aba Corte)
+
+- **Proporção**: Original, Livre, 1:1, 4:5, 2:3, 5:7, 9:16... O quadro de corte aparece em cima da
+  foto: os cantos mudam o tamanho, o meio move. A proporção fica travada.
+- **↺ ↻ Girar** 90°, **⇋ Espelhar**, **Endireitar** (ângulo fino), **Vertical** e **Horizontal**
+  (perspectiva: parede ou coluna "caindo").
+- **Auto**: endireita pelas linhas retas da foto (paredes, portas, horizonte). Se a foto não tem
+  linhas retas confiáveis, não gira.
+- Vale por foto (**Só esta foto**). Com **Todas as fotos**, a proporção escolhida corta todas as
+  fotos do evento, centralizado (em pé ou deitada, a proporção acompanha a foto).
+- Fotos feitas com a câmera em pé agora aparecem e saem em pé.
+
 ### Botão Auto (como o do Lightroom)
 
 Na aba **Básico**, o botão **Auto** acerta cada foto sozinha, sem treino: balanço de branco pelo

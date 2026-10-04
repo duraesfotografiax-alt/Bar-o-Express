@@ -191,3 +191,36 @@ def test_aprende_um_preset_por_tipo_de_evento(tmp_path, monkeypatch):
         assert preset["auto_tom"] == 100
         alvos[c["nome"]] = preset["auto_alvo"]["meio"]
     assert alvos["Durães · Aniversário"] > alvos["Durães · Casamento"]   # aprendeu que é mais claro
+
+
+def test_ia_mira_no_jeito_das_cenas_parecidas(tmp_path):
+    """Fotos prontas de festa (escuras, com luzes) e de externa (claras): a IA não pode usar uma
+    média só. Foto nova de festa mira no jeito das festas; de externa, no das externas."""
+    from editalote.auto_tom import ALVO_DURAES, alvo_da_cena, medir_cenas, medir_estilo
+
+    rng = np.random.default_rng(5)
+
+    def festa(semente, brilho):
+        r = np.random.default_rng(semente)
+        v = np.full((300, 200, 3), 0.45 * brilho / 0.45) + r.normal(0, 0.01, (300, 200, 3))
+        v[120:260, 60:140] = np.array([0.55, 0.38, 0.30]) * brilho / 0.45   # pessoas no centro
+        for _ in range(8):                                                   # luzes no alto
+            y, x = r.integers(5, 60), r.integers(5, 190)
+            v[y:y + 6, x:x + 6] = 1.0
+        return np.clip(v * np.array([1.0, 0.9, 0.75]), 0, 1)
+
+    def externa(semente, brilho):
+        r = np.random.default_rng(semente)
+        v = np.zeros((200, 300, 3))
+        v[:80] = [0.45, 0.65, 0.95]                                          # céu
+        v[80:] = [0.35, 0.6, 0.25]                                           # grama
+        v[60:180, 120:180] = [0.75, 0.6, 0.5]
+        v = v * brilho / 0.6 * 1.25 + r.normal(0, 0.02, v.shape)
+        return np.clip(v, 0, 1)
+
+    prontas = [festa(i, 0.45) for i in range(10)] + [externa(i, 0.7) for i in range(10)]
+    geral = {**ALVO_DURAES, **medir_estilo(prontas)}
+    cenas = medir_cenas(prontas)
+    alvo_festa = alvo_da_cena(festa(99, 0.2), geral, cenas)      # original de festa, mais escura
+    alvo_externa = alvo_da_cena(externa(99, 0.5), geral, cenas)
+    assert alvo_festa["meio"] < geral["meio"] - 0.02 < alvo_externa["meio"] - 0.04

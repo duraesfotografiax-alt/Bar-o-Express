@@ -44,25 +44,116 @@ def _neutros(rgb: np.ndarray) -> tuple[float, float]:
     return quente, verde
 
 
+# limites de segurança: um alvo exagerado (foto P&B, foto muito escura) não pode estragar tudo
+LIMITES = {"meio": (0.38, 0.86), "preto": (0.0, 0.25), "branco": (0.85, 0.99),
+           "desvio": (0.12, 0.32), "saturacao": (0.03, 0.25), "quente": (-0.1, 0.35),
+           "pele": (0.45, 0.75)}
+
+
+def _medidas(foto: np.ndarray) -> dict:
+    rgb = foto.reshape(-1, 3)
+    y = rgb @ PESOS_Y
+    p1, p50, p99 = np.percentile(y, [1, 50, 99])
+    return {"meio": p50, "preto": p1, "branco": p99, "desvio": y.std(),
+            "saturacao": _sat(rgb), "quente": _neutros(rgb)[0],
+            "pele": luz_das_pessoas(foto) if foto.ndim == 3 else None}
+
+
+def _limitar(alvo: dict) -> dict:
+    return {k: round(float(np.clip(v, *LIMITES[k])), 4) for k, v in alvo.items()}
+
+
 def medir_estilo(fotos_rgb: list[np.ndarray]) -> dict:
     """Mede o "jeito" de fotos já prontas (o alvo da IA automática)."""
-    medidas = []
-    for foto in fotos_rgb:
-        rgb = foto.reshape(-1, 3)
-        y = rgb @ PESOS_Y
-        p1, p50, p99 = np.percentile(y, [1, 50, 99])
-        medidas.append({"meio": p50, "preto": p1, "branco": p99, "desvio": y.std(),
-                        "saturacao": _sat(rgb), "quente": _neutros(rgb)[0],
-                        "pele": luz_das_pessoas(foto) if foto.ndim == 3 else None})
+    medidas = [_medidas(foto) for foto in fotos_rgb]
     alvo = {}
     for k in ALVO_DURAES:
         valores = [m[k] for m in medidas if m[k] is not None]
         alvo[k] = float(np.median(valores)) if valores else ALVO_DURAES[k]
-    # limites de segurança: um alvo exagerado (foto P&B, foto muito escura) não pode estragar tudo
-    limites = {"meio": (0.38, 0.86), "preto": (0.0, 0.25), "branco": (0.85, 0.99),
-               "desvio": (0.12, 0.32), "saturacao": (0.03, 0.25), "quente": (-0.1, 0.35),
-               "pele": (0.45, 0.75)}
-    return {k: round(float(np.clip(v, *limites[k])), 4) for k, v in alvo.items()}
+    return _limitar(alvo)
+
+
+# ------------------------------------------------------- foto por foto: cenas parecidas
+# Cada foto pronta do estúdio vira um exemplo "cena -> como ficou". Numa foto nova, a IA procura
+# os exemplos de cena mais parecida (salão escuro com luzes, externa de dia, mesa do bolo, retrato)
+# e mira no jeito DELES, em vez de uma média única do evento.
+
+VIZINHOS_CENA = 10
+PESO_LOCAL = 0.65          # quanto as cenas parecidas pesam contra o jeito geral do tipo de evento
+_PESOS_DESCRITOR = np.array([0.6] * 9 + [0.8] * 6 + [1.0, 1.2, 0.6, 0.7, 1.0, 0.8])
+
+
+def descrever_cena(foto: np.ndarray) -> np.ndarray:
+    """Descrição da cena que muda pouco com a edição (para comparar original com foto pronta)."""
+    if max(foto.shape[:2]) > 320:   # mesma escala no treino e no uso (a textura depende dela)
+        from PIL import Image
+
+        p = Image.fromarray((np.clip(foto, 0, 1) * 255).astype(np.uint8))
+        p.thumbnail((300, 300), Image.Resampling.BILINEAR)
+        foto = np.asarray(p, dtype=np.float64) / 255.0
+    h, w = foto.shape[:2]
+    y = foto @ PESOS_Y
+    media = float(y.mean()) + 1e-3
+    # 1) onde está a luz: 3x3 relativo ao brilho médio (janela, palco, fundo escuro)
+    grade = [float(y[i * h // 3:(i + 1) * h // 3, j * w // 3:(j + 1) * w // 3].mean()) / media
+             for i in range(3) for j in range(3)]
+    # 2) cores da cena (decoração, grama, céu), pesadas pela força da cor
+    mx, mn = foto.max(axis=2), foto.min(axis=2)
+    croma = mx - mn
+    r, g, b = foto[..., 0], foto[..., 1], foto[..., 2]
+    matiz = (np.degrees(np.arctan2(np.sqrt(3) * (g - b), 2 * r - g - b)) + 360) % 360
+    hist, _ = np.histogram(matiz, bins=6, range=(0, 360), weights=croma)
+    hist = hist / max(hist.sum(), 1e-6)
+    # 3) colorido, pessoas, brilho, textura, luzes acesas, foto em pé ou deitada
+    colorido = float(croma.mean()) / (media + 0.05)
+    from .assunto import pele
+
+    gente = float((pele(foto) > 0.4).mean()) * 10
+    brilho = float(np.log2(np.median(y) + 0.02))
+    textura = float(np.abs(np.diff(y, axis=1)).mean()) / (media + 0.05)
+    luzes = float((y > 0.97).mean()) * 20
+    em_pe = 1.0 if h > w else 0.0
+    return np.array(grade + list(hist) + [colorido, gente, brilho, textura, luzes, em_pe])
+
+
+def medir_cenas(fotos_rgb: list[np.ndarray]) -> dict:
+    """Exemplos "cena -> jeito" das fotos prontas (vai no preset como auto_cenas)."""
+    itens = []
+    for foto in fotos_rgb:
+        if foto.ndim != 3:
+            continue
+        m = _medidas(foto)
+        alvo = _limitar({k: v for k, v in m.items() if v is not None})
+        itens.append({"d": [round(float(v), 4) for v in descrever_cena(foto)], "a": alvo})
+    if not itens:
+        return {}
+    d = np.array([i["d"] for i in itens])
+    desvio = np.where(d.std(axis=0) < 1e-6, 1.0, d.std(axis=0))
+    return {"media": d.mean(axis=0).round(4).tolist(), "desvio": desvio.round(4).tolist(), "itens": itens}
+
+
+def alvo_da_cena(foto: np.ndarray, alvo_geral: dict, cenas: dict) -> dict:
+    """Jeito das fotos prontas de cena mais parecida com esta, misturado com o jeito geral."""
+    itens = cenas.get("itens") or []
+    if not itens or foto.ndim != 3:
+        return alvo_geral
+    media, desvio = np.array(cenas["media"]), np.array(cenas["desvio"])
+    x = (np.array([i["d"] for i in itens]) - media) / desvio
+    q = (descrever_cena(foto) - media) / desvio
+    dist = np.sqrt((((x - q) * _PESOS_DESCRITOR) ** 2).sum(axis=1))
+    k = min(VIZINHOS_CENA, len(itens))
+    perto = np.argsort(dist)[:k]
+    pesos = 1.0 / (dist[perto] + 0.5)
+    final = {}
+    for chave, geral in alvo_geral.items():
+        valores = [(itens[i]["a"].get(chave), p) for i, p in zip(perto, pesos)
+                   if itens[i]["a"].get(chave) is not None]
+        if not valores:
+            final[chave] = geral
+            continue
+        local = sum(v * p for v, p in valores) / sum(p for _, p in valores)
+        final[chave] = PESO_LOCAL * local + (1 - PESO_LOCAL) * geral
+    return _limitar(final)
 
 
 def _curva_s(v: np.ndarray, s: float) -> np.ndarray:
@@ -164,9 +255,10 @@ _cache: OrderedDict = OrderedDict()
 _trava = Lock()
 
 
-def calcular_foto(caminho_foto: str, alvo: dict | None = None) -> dict:
+def calcular_foto(caminho_foto: str, alvo: dict | None = None, cenas: dict | None = None) -> dict:
+    marca_cenas = (len(cenas.get("itens", [])), tuple(cenas.get("media", [])[:4])) if cenas else None
     try:
-        chave = (caminho_foto, os.path.getmtime(caminho_foto), repr(sorted((alvo or {}).items())))
+        chave = (caminho_foto, os.path.getmtime(caminho_foto), repr(sorted((alvo or {}).items())), marca_cenas)
     except OSError:
         chave = None
     with _trava:
@@ -174,6 +266,8 @@ def calcular_foto(caminho_foto: str, alvo: dict | None = None) -> dict:
             _cache.move_to_end(chave)
             return _cache[chave]
     rgb = np.asarray(carregar_reduzida(caminho_foto, 500).convert("RGB"), dtype=np.float64) / 255.0
+    if cenas:
+        alvo = alvo_da_cena(rgb, {**ALVO_DURAES, **(alvo or {})}, cenas)
     auto = calcular(rgb, alvo)
     if chave is not None:
         with _trava:
@@ -193,7 +287,13 @@ def aplicar_auto(ajustes: dict, caminho_foto: str, rgb: np.ndarray | None = None
     if forca <= 0 or (ajustes.get("estilo_ia") and float(ajustes.get("ia_forca", 100) or 0) > 0):
         return ajustes, {}
     alvo = ajustes.get("auto_alvo") or None
-    auto = calcular(rgb, alvo) if rgb is not None else calcular_foto(caminho_foto, alvo)
+    cenas = ajustes.get("auto_cenas") or None
+    if rgb is not None:
+        if cenas:
+            alvo = alvo_da_cena(rgb, {**ALVO_DURAES, **(alvo or {})}, cenas)
+        auto = calcular(rgb, alvo)
+    else:
+        auto = calcular_foto(caminho_foto, alvo, cenas)
     final = dict(ajustes)
     for chave in ("exposicao", "temperatura", "matiz", "vibracao"):
         final[chave] = round(float(final.get(chave, 0) or 0) + auto[chave] * forca, 3)
