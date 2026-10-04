@@ -231,9 +231,11 @@ def escanear():
 def miniatura():
     caminho = _jpeg_valido(request.args.get("caminho"))
     lado = min(int(request.args.get("lado", 400)), 1600)
+    from .geometria import orientar
+
     with Image.open(caminho) as img:
         img.draft("RGB", (lado, lado))
-        img = img.convert("RGB")
+        img = orientar(img).convert("RGB")
         img.thumbnail((lado, lado))
         buf = io.BytesIO()
         img.save(buf, "JPEG", quality=85)
@@ -247,12 +249,28 @@ def previa():
     caminho = _jpeg_valido(dados.get("caminho"))
     try:
         conteudo, ajuste_ia = previa_jpeg(caminho, _resolver_estilo(dados.get("ajustes") or {}),
-                                          int(dados.get("lado", 1400)))
+                                          int(dados.get("lado", 1400)),
+                                          so_geometria=bool(dados.get("so_geometria")),
+                                          sem_corte=bool(dados.get("sem_corte")))
     except Exception as erro:
         return jsonify({"erro": str(erro)}), 400
     resposta = send_file(io.BytesIO(conteudo), mimetype="image/jpeg")
     resposta.headers["X-Ajuste-IA"] = json.dumps(ajuste_ia)
     return resposta
+
+
+@app.post("/api/auto-endireitar")
+def auto_endireitar():
+    """Ângulo automático para a foto, medido depois do giro/espelho/perspectiva já escolhidos."""
+    from .geometria import aplicar_geometria, angulo_automatico
+    from .processamento import carregar_reduzida
+
+    dados = request.json or {}
+    caminho = _jpeg_valido(dados.get("caminho"))
+    a = dados.get("ajustes") or {}
+    base = {k: a.get(k, 0) for k in ("girar", "espelhar", "perspectiva_v", "perspectiva_h")}
+    img = aplicar_geometria(carregar_reduzida(caminho, 1200), base, sem_corte=True)
+    return jsonify({"endireitar": angulo_automatico(img)})
 
 
 @app.get("/api/presets")

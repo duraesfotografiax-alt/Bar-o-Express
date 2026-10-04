@@ -158,6 +158,7 @@
       <button data-aba="cor" onclick="abrirAba(this)">Cor</button>
       <button data-aba="curvas" onclick="abrirAba(this)">Curvas</button>
       <button data-aba="detalhes" onclick="abrirAba(this)">Detalhes</button>
+      <button data-aba="corte" onclick="abrirAba(this)">Corte</button>
     </div>
 
     <div class="aba ativa" data-aba="basico">
@@ -187,6 +188,35 @@
       </div>
       <canvas id="curva" width="512" height="512"></canvas>
       <p class="dica">Clique para criar um ponto e arraste. Dois cliques num ponto apagam.</p>
+    </div>
+    <div class="aba" data-aba="corte">
+      <div class="linha" style="justify-content:space-between; margin-top:16px">
+        <h4 style="margin:0">Cortar e girar</h4>
+        <button class="contorno" onclick="geoAuto()" title="Endireita a foto pelas linhas retas (paredes, portas, horizonte)">Auto</button>
+      </div>
+      <label>Proporção</label>
+      <select id="proporcao" onchange="mudarProporcao()">
+        <option value="original">Original</option>
+        <option value="livre">Livre</option>
+        <option value="1:1">1 : 1 (quadrado)</option>
+        <option value="4:5">4 : 5 (Instagram)</option>
+        <option value="2:3">2 : 3 (10x15)</option>
+        <option value="3:4">3 : 4</option>
+        <option value="5:7">5 : 7 (13x18)</option>
+        <option value="4:6">4 : 6</option>
+        <option value="9:16">9 : 16 (Stories)</option>
+        <option value="16:9">16 : 9</option>
+      </select>
+      <div class="linha geo-botoes">
+        <button onclick="girar90(-1)" title="Girar 90° anti-horário">↺ Girar</button>
+        <button onclick="girar90(1)" title="Girar 90° horário">↻ Girar</button>
+        <button onclick="espelharFoto()" title="Espelhar">⇋ Espelhar</button>
+      </div>
+      <h4>Geometria</h4><div id="slidersGeo"></div>
+      <div class="linha" style="justify-content:flex-end"><button class="fantasma" onclick="zerarGeometria()">Zerar corte e geometria</button></div>
+      <p class="dica">Arraste o quadro em cima da foto para cortar (cantos mudam o tamanho, o meio move).
+        A proporção escolhida fica travada. Com <b>Todas as fotos</b> ligado, a proporção vale para o
+        evento inteiro (corte centralizado em cada foto).</p>
     </div>
     <div class="aba" data-aba="detalhes">
       <h4>Presença</h4><div id="slidersDetalhe"></div>

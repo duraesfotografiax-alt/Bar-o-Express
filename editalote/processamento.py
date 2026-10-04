@@ -28,6 +28,14 @@ AJUSTES_PADRAO: dict = {
     "auto_tom": 0,               # botão Auto (como o do Lightroom): 0 = desligado, 100 = força total
     "realce_pessoas": 0,         # 0..100: clareia e destaca as pessoas (e de leve o cenário)
     "melhorar_qualidade": 0,     # 0..100: tira ruído (ISO alto) e realça os detalhes
+    # Cortar, girar e geometria (ver geometria.py)
+    "girar": 0,                  # 0, 90, 180, 270 (sentido horário)
+    "espelhar": 0,               # 0/1
+    "endireitar": 0.0,           # graus, -45..45 (positivo = horário)
+    "perspectiva_v": 0,          # -100..100
+    "perspectiva_h": 0,          # -100..100
+    "corte": None,               # [x0, y0, x1, y1] em 0..1, depois da geometria
+    "proporcao": "original",     # só para a tela: proporção travada do corte
     "auto_exposicao": 0.7,       # 0 = desligado, 1 = corrige tudo
     "auto_balanco_branco": 0.4,  # 0 = desligado, 1 = neutro total
     "exposicao": 0.0,            # em EV (stops), -2..2
@@ -77,7 +85,7 @@ for _cor, _ in CORES_HSL:
 CAMPOS_POR_CAMERA = ("exposicao", "temperatura", "matiz", "saturacao")
 
 
-CAMPOS_ANULAVEIS = ("lut", "curva", "curva_r", "curva_g", "curva_b", "curva_ref", "estilo_ia",
+CAMPOS_ANULAVEIS = ("corte", "lut", "curva", "curva_r", "curva_g", "curva_b", "curva_ref", "estilo_ia",
                     "curva_par_r", "curva_par_g", "curva_par_b")
 
 
@@ -110,9 +118,12 @@ def ajustes_individuais(ajustes: dict, caminho: str) -> dict:
     por_foto = ajustes.get("por_foto") or {}
     final = {k: v for k, v in ajustes.items() if k != "por_foto"}
     extra = por_foto.get(chave_foto(caminho)) or por_foto.get(caminho) or {}
-    for campo, delta in extra.items():
-        if isinstance(final.get(campo, 0), (int, float)) and isinstance(delta, (int, float)):
-            final[campo] = float(final.get(campo, 0) or 0) + float(delta)
+    numero = lambda v: isinstance(v, (int, float)) and not isinstance(v, bool)
+    for campo, valor in extra.items():
+        if numero(valor) and (numero(final.get(campo, 0)) or final.get(campo) is None):
+            final[campo] = float(final.get(campo, 0) or 0) + float(valor)   # controles: diferença
+        else:
+            final[campo] = valor                                           # corte, proporção: troca
     return final
 
 
@@ -252,9 +263,11 @@ class Analise:
 
 def carregar_reduzida(caminho: str, lado: int = 1000) -> Image.Image:
     """Abre o JPEG já reduzido (decodificação rápida por 'draft')."""
+    from .geometria import orientar
+
     img = Image.open(caminho)
     img.draft("RGB", (lado, lado))
-    img = img.convert("RGB")
+    img = orientar(img).convert("RGB")      # foto feita em pé aparece em pé
     img.thumbnail((lado, lado), Image.Resampling.BILINEAR)
     return img
 
@@ -428,6 +441,10 @@ def aplicar(img: Image.Image, ajustes: dict, analise: Analise | None,
             lut: LutCube | None = None, tamanho_lut: int = TAMANHO_LUT) -> Image.Image:
     if img.mode != "RGB":
         img = img.convert("RGB")
+    from .geometria import aplicar_geometria, tem_geometria
+
+    if tem_geometria(ajustes):   # corta antes: a cor é aplicada só no que fica
+        img = aplicar_geometria(img, ajustes, sem_corte=bool(ajustes.get("_sem_corte")))
     saida = img.filter(montar_lut(ajustes, analise, lut, tamanho_lut))
     claridade = float(ajustes.get("claridade", 0) or 0) / 100.0
     if claridade:
@@ -486,7 +503,8 @@ def carregar_lut(ajustes: dict) -> LutCube | None:
     return LutCube.abrir(caminho) if caminho else None
 
 
-def previa_jpeg(caminho: str, ajustes: dict, lado: int = 1400) -> tuple[bytes, dict]:
+def previa_jpeg(caminho: str, ajustes: dict, lado: int = 1400, so_geometria: bool = False,
+                sem_corte: bool = False) -> tuple[bytes, dict]:
     """Prévia reduzida já editada (mesma análise e mesma IA da exportação).
 
     Retorna (jpeg, ajustes que a IA de estilo acrescentou nesta foto).
@@ -495,6 +513,14 @@ def previa_jpeg(caminho: str, ajustes: dict, lado: int = 1400) -> tuple[bytes, d
     from .metadados import ler_info
 
     ajustes = ajustes_para_camera(ajustes_individuais(completar_ajustes(ajustes), caminho), ler_info(caminho).camera)
+    if so_geometria:   # o "antes" com o mesmo corte/giro, para comparar lado a lado
+        from .geometria import aplicar_geometria
+
+        reduzida, _ = _reduzida_da_previa(caminho, lado)
+        buf = io.BytesIO()
+        aplicar_geometria(reduzida, ajustes, sem_corte=sem_corte).save(buf, "JPEG", quality=85)
+        return buf.getvalue(), {}
+    ajustes = {**ajustes, "_sem_corte": sem_corte}
     ajustes, ajuste_ia = ajustes_da_foto(ajustes, caminho)
     from .auto_tom import aplicar_auto
 

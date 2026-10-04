@@ -141,12 +141,13 @@ def test_lote_completo(tmp_path):
     assert len(list((saida / "web").glob("*.jpg"))) == 13
     assert not list(saida.glob("*.parcial"))
 
-    # A primeira foto (18:00, orientação 6) mantém resolução e EXIF
+    # A primeira foto (18:00, feita em pé: orientação 6) sai com os pixels já em pé,
+    # mesma resolução e EXIF, e Orientation = 1 para nenhum programa girar de novo
     primeira = Image.open(saida / "Casamento_Ana_0001.jpg")
-    assert primeira.size == (600, 400)
+    assert primeira.size == (400, 600)
     exif = primeira.getexif()
     assert exif[0x0110] == "Canon EOS 250D"
-    assert exif[0x0112] == 6
+    assert exif[0x0112] == 1
     # A Sony de 18:05:30 fica entre as Canon de 18:05 e 18:06
     assert ler_info(str(saida / "Casamento_Ana_0007.jpg")).camera == "ZV-E10 #9"
 

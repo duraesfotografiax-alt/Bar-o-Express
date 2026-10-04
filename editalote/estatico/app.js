@@ -23,6 +23,11 @@ const GRUPOS = {
     ["nitidez", "Nitidez", 0, 100, 1],
   ],
   slidersLut: [["lut_intensidade", "Força da LUT", 0, 100, 1]],
+  slidersGeo: [
+    ["endireitar", "Endireitar (°)", -15, 15, 0.05, "Ângulo fino. O botão Auto acha sozinho pelas linhas retas"],
+    ["perspectiva_v", "Vertical", -100, 100, 1, "Corrige paredes e colunas \"caindo\" (foto de baixo para cima)"],
+    ["perspectiva_h", "Horizontal", -100, 100, 1, "Corrige a foto tirada de lado"],
+  ],
   slidersCurva: [
     ["curva_realces", "Realces", -100, 100, 1], ["curva_claros", "Claros", -100, 100, 1],
     ["curva_escuros", "Escuros", -100, 100, 1], ["curva_sombras", "Sombras", -100, 100, 1],
@@ -104,7 +109,11 @@ function escolherCor(cor) {
   document.querySelectorAll("#coresHSL button").forEach(b => b.classList.toggle("ativo", b.dataset.cor === cor));
   document.querySelectorAll("#slidersHSL [data-grupo]").forEach(d => d.style.display = d.dataset.grupo === cor ? "" : "none");
 }
+let abaAtual = "basico";
 function abrirAba(btn) {
+  const antes = abaAtual;
+  abaAtual = btn.dataset.aba;
+  if ((antes === "corte") !== (abaAtual === "corte")) { mostrarCorte(); mudou(); }
   document.querySelectorAll("#abas button").forEach(b => b.classList.toggle("ativa", b === btn));
   document.querySelectorAll(".aba").forEach(a => a.classList.toggle("ativa", a.dataset.aba === btn.dataset.aba));
   if (btn.dataset.aba === "curvas") desenharCurva();
@@ -117,8 +126,21 @@ const CONTROLES_NUM = new Set(TODOS_CONTROLES.map(c => c[0]));
 function efetivos() {
   const final = {...ajustes};
   for (const [k, d] of Object.entries((fotoAtual && porFoto[fotoAtual]) || {}))
-    final[k] = (+final[k] || 0) + d;
+    final[k] = typeof d === "number" && (typeof final[k] === "number" || final[k] == null)
+      ? (+final[k] || 0) + d : d;       // controles: diferença · corte/proporção: troca
   return final;
+}
+// muda qualquer ajuste respeitando "Só esta foto" x "Todas as fotos"
+function definir(k, v) {
+  if (modoTodas || !fotoAtual) { ajustes[k] = v; return; }
+  const atual = porFoto[fotoAtual] = porFoto[fotoAtual] || {};
+  if (typeof v === "number" && typeof (ajustes[k] ?? 0) === "number") {
+    const d = +(v - (+ajustes[k] || 0)).toFixed(4);
+    if (Math.abs(d) < 1e-6) delete atual[k]; else atual[k] = d;
+  } else if (JSON.stringify(v) === JSON.stringify(ajustes[k] ?? null)) delete atual[k];
+  else atual[k] = v;
+  if (!Object.keys(atual).length) delete porFoto[fotoAtual];
+  guardarPorFoto();
 }
 function mudarControle(k, v) {
   if (modoTodas || !fotoAtual) {
@@ -170,6 +192,7 @@ function mostrarAjustes() {
   $("s_ia_forca").value = ajustes.ia_forca ?? 100; $("o_ia_forca").value = ajustes.ia_forca ?? 100;
   $("btnAuto").className = +(ajustes.auto_tom || 0) > 0 ? "destaque" : "contorno";
   $("lut").value = ajustes.lut || "";
+  $("proporcao").value = ef.proporcao || "original";
   mostrarIA();
   desenharCurva();
 }
@@ -508,10 +531,12 @@ function selecionar(img) {
       title="Liga/desliga a comparação antes e depois (tecla C)">◧ Antes / Depois</button>
     <div class="chip-ia" id="chipIA"></div>
     <div class="carregando" id="carregando"></div>`;
-  $("imgAntes").onload = () => posicionar(modoComparar ? 0.5 : 0);
+  $("imgAntes").onload = () => { posicionar(modoComparar && abaAtual !== "corte" ? 0.5 : 0); mostrarCorte(); };
   $("comparar").classList.toggle("inteira", !modoComparar);
   ligarArraste();
   ajustesMostrados = null;
+  chaveAntes = chaveGeo(efetivos(), false);
+  if (!semGeometria(efetivos()) || abaAtual === "corte") chaveAntes = "";
   mostrarAjustes();
   pedirPrevia();
 }
@@ -535,13 +560,167 @@ function posicionar(f) {
 }
 function ligarArraste() {
   const c = $("comparar");
-  const mover = e => { if (!modoComparar) return; const r = c.getBoundingClientRect(); posicionar((e.clientX - r.left) / r.width); };
+  const mover = e => { if (!modoComparar || abaAtual === "corte") return; const r = c.getBoundingClientRect(); posicionar((e.clientX - r.left) / r.width); };
   let arrastando = false;
   c.addEventListener("pointerdown", e => { arrastando = true; mover(e); });
   window.addEventListener("pointermove", e => arrastando && mover(e));
   window.addEventListener("pointerup", () => arrastando = false);
 }
-window.addEventListener("resize", () => { const c = $("comparar"); if (c) posicionar(modoComparar ? (+c.dataset.f || 0.5) : 0); });
+window.addEventListener("resize", () => {
+  const c = $("comparar");
+  if (c) { posicionar(modoComparar && abaAtual !== "corte" ? (+c.dataset.f || 0.5) : 0); mostrarCorte(); }
+});
+
+// ------------------------------------------------------------------ corte e geometria
+const CAMPOS_GEO = ["girar", "espelhar", "endireitar", "perspectiva_v", "perspectiva_h", "corte", "proporcao"];
+let chaveAntes = "";
+function chaveGeo(a, semCorte) {
+  return JSON.stringify([CAMPOS_GEO.map(k => a[k] ?? null), semCorte]);
+}
+function semGeometria(a) {
+  return !(+a.girar % 360) && !+a.espelhar && !+a.endireitar && !+a.perspectiva_v && !+a.perspectiva_h &&
+    !a.corte && ["original", "livre", undefined, null, ""].includes(a.proporcao);
+}
+// o "antes" recebe o mesmo giro/corte do "depois", para os dois ficarem do mesmo tamanho
+async function atualizarAntes(alvo, a, semCorte) {
+  const chave = chaveGeo(a, semCorte);
+  if (chave === chaveAntes) return;
+  chaveAntes = chave;
+  const img = $("imgAntes");
+  if (!img) return;
+  if (semGeometria(a)) {
+    img.src = `/api/miniatura?caminho=${encodeURIComponent(alvo)}&lado=1600`;
+    return;
+  }
+  const r = await fetch("/api/previa", {method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({caminho: alvo, ajustes: a, lado: 1600, so_geometria: true, sem_corte: semCorte})});
+  if (!r.ok || alvo !== fotoAtual || chave !== chaveAntes) return;
+  const velho = img.src;
+  img.onload = () => { if (velho.startsWith("blob:")) URL.revokeObjectURL(velho);
+                       posicionar(modoComparar && abaAtual !== "corte" ? (+$("comparar").dataset.f || 0.5) : 0);
+                       mostrarCorte(); };
+  img.src = URL.createObjectURL(await r.blob());
+}
+function girar90(sentido) {
+  const a = efetivos();
+  definir("girar", (((+a.girar || 0) + 90 * sentido) % 360 + 360) % 360);
+  definir("corte", null);
+  mostrarAjustes(); mudou();
+}
+function espelharFoto() {
+  definir("espelhar", +efetivos().espelhar ? 0 : 1);
+  definir("corte", null);
+  mostrarAjustes(); mudou();
+}
+function zerarGeometria() {
+  for (const k of ["girar", "espelhar", "endireitar", "perspectiva_v", "perspectiva_h"]) definir(k, 0);
+  definir("corte", null); definir("proporcao", "original");
+  mostrarAjustes(); mudou(); mostrarCorte();
+}
+async function geoAuto() {
+  if (!fotoAtual) return;
+  aviso("Procurando as linhas retas da foto…");
+  try {
+    const r = await api("/api/auto-endireitar", {caminho: fotoAtual, ajustes: efetivos()});
+    definir("endireitar", r.endireitar);
+    mostrarAjustes(); mudou();
+    aviso(r.endireitar ? `Foto endireitada: ${num(r.endireitar, 2)}°`
+      : "Não achei linhas retas confiáveis nesta foto (ou ela já está reta). Use o controle Endireitar.");
+  } catch (e) { aviso(e.message, true); }
+}
+function razaoProporcao(prop, w, h) {
+  if (!prop || prop === "livre") return null;
+  if (prop === "original") return w / h;
+  const [a, b] = prop.split(":").map(Number);
+  let r = a / b;
+  if ((r > 1) !== (w > h) && Math.abs(r - 1) > 1e-6) r = 1 / r;
+  return r;
+}
+function corteCentral(prop, w, h) {
+  const r = razaoProporcao(prop, w, h);
+  if (!r) return [0, 0, 1, 1];
+  if (w / h > r) { const f = r * h / w; return [(1 - f) / 2, 0, (1 + f) / 2, 1]; }
+  const f = w / (r * h); return [0, (1 - f) / 2, 1, (1 + f) / 2];
+}
+function mudarProporcao() {
+  definir("proporcao", $("proporcao").value);
+  definir("corte", null);          // recomeça centralizado na nova proporção
+  mudou(); mostrarCorte();
+}
+// quadro de corte em cima da foto (só na aba Corte)
+function mostrarCorte() {
+  const c = $("comparar");
+  if (!c) return;
+  let caixa = $("corteCaixa");
+  const ativo = abaAtual === "corte";
+  c.classList.toggle("cortando", ativo);
+  if (!ativo) { if (caixa) caixa.remove(); return; }
+  if (!caixa) {
+    caixa = document.createElement("div");
+    caixa.id = "corteCaixa"; caixa.className = "corte-caixa";
+    caixa.innerHTML = '<i data-h="nw"></i><i data-h="ne"></i><i data-h="sw"></i><i data-h="se"></i>';
+    c.appendChild(caixa);
+    ligarCorte(caixa);
+  }
+  posicionar(0);
+  const img = $("imgAntes");
+  const a = efetivos();
+  const box = a.corte || corteCentral(a.proporcao || "original", img.naturalWidth || 3, img.naturalHeight || 2);
+  desenharCaixa(box);
+}
+function desenharCaixa(box) {
+  const caixa = $("corteCaixa"), img = $("imgAntes");
+  if (!caixa || !img) return;
+  const w = img.clientWidth, h = img.clientHeight;
+  Object.assign(caixa.style, {left: box[0] * w + "px", top: box[1] * h + "px",
+    width: (box[2] - box[0]) * w + "px", height: (box[3] - box[1]) * h + "px"});
+  caixa.dataset.box = JSON.stringify(box);
+}
+function ligarCorte(caixa) {
+  let inicio = null;
+  caixa.addEventListener("pointerdown", e => {
+    e.stopPropagation(); e.preventDefault();
+    caixa.setPointerCapture(e.pointerId);
+    inicio = {x: e.clientX, y: e.clientY, box: JSON.parse(caixa.dataset.box), h: e.target.dataset.h || "mover"};
+  });
+  caixa.addEventListener("pointermove", e => {
+    if (!inicio) return;
+    const img = $("imgAntes"), W = img.clientWidth, H = img.clientHeight;
+    const dx = (e.clientX - inicio.x) / W, dy = (e.clientY - inicio.y) / H;
+    let [x0, y0, x1, y1] = inicio.box;
+    const min = 0.05;
+    if (inicio.h === "mover") {
+      const bw = x1 - x0, bh = y1 - y0;
+      x0 = Math.min(Math.max(x0 + dx, 0), 1 - bw); y0 = Math.min(Math.max(y0 + dy, 0), 1 - bh);
+      x1 = x0 + bw; y1 = y0 + bh;
+    } else {
+      if (inicio.h.includes("w")) x0 = Math.min(Math.max(x0 + dx, 0), x1 - min);
+      if (inicio.h.includes("e")) x1 = Math.max(Math.min(x1 + dx, 1), x0 + min);
+      if (inicio.h.includes("n")) y0 = Math.min(Math.max(y0 + dy, 0), y1 - min);
+      if (inicio.h.includes("s")) y1 = Math.max(Math.min(y1 + dy, 1), y0 + min);
+      const r = razaoProporcao(efetivos().proporcao || "original", img.naturalWidth, img.naturalHeight);
+      if (r) {   // trava a proporção: a altura segue a largura (presa no canto oposto)
+        const rn = r * H / W;                     // proporção em unidades normalizadas
+        let bw = x1 - x0, bh = bw / rn;
+        const maxH = inicio.h.includes("n") ? y1 : 1 - y0;
+        if (bh > maxH) { bh = maxH; bw = bh * rn; }
+        if (inicio.h.includes("w")) x0 = x1 - bw; else x1 = x0 + bw;
+        if (inicio.h.includes("n")) y0 = y1 - bh; else y1 = y0 + bh;
+      }
+    }
+    desenharCaixa([x0, y0, x1, y1]);
+  });
+  const soltar = () => {
+    if (!inicio) return;
+    inicio = null;
+    const box = JSON.parse(caixa.dataset.box).map(v => +v.toFixed(4));
+    const cheio = box[0] <= 0.0005 && box[1] <= 0.0005 && box[2] >= 0.9995 && box[3] >= 0.9995;
+    definir("corte", cheio ? null : box);
+    if (fotoAtual) marcarAjustadas();
+  };
+  caixa.addEventListener("pointerup", soltar);
+  caixa.addEventListener("pointercancel", soltar);
+}
 
 // Antes/Depois: por padrão a foto aparece INTEIRA (editada); o botão liga a comparação
 let modoComparar = false;
@@ -596,8 +775,10 @@ async function atualizarPrevia() {
   const alvo = fotoAtual;
   $("carregando") && ($("carregando").style.display = "block");
   const pedidos = structuredClone(efetivos());
+  const semCorte = abaAtual === "corte";
+  atualizarAntes(alvo, pedidos, semCorte);
   const r = await fetch("/api/previa", {method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({caminho: alvo, ajustes: pedidos, lado: 1600})});
+    body: JSON.stringify({caminho: alvo, ajustes: pedidos, lado: 1600, sem_corte: semCorte})});
   if ($("carregando")) $("carregando").style.display = "none";
   if (!r.ok) { aviso((await r.json()).erro, true); return; }
   let dif = {};
@@ -613,7 +794,7 @@ async function atualizarPrevia() {
       if (velho) URL.revokeObjectURL(velho);
       ajustesMostrados = enviados;
       filtroInstantaneo();          // só sobra filtro se o controle mudou de novo nesse meio tempo
-      posicionar(modoComparar ? (+$("comparar").dataset.f || 0.5) : 0);
+      posicionar(modoComparar && abaAtual !== "corte" ? (+$("comparar").dataset.f || 0.5) : 0);
       pronto();
     };
     d.src = url;

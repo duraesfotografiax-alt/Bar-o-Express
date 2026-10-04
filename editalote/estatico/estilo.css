@@ -162,7 +162,7 @@ input[type=range]::-moz-range-thumb { width: 10px; height: 10px; border-radius: 
   animation: brilho 2.5s linear infinite; }
 @keyframes brilho { to { background-position: -200% 0; } }
 
-.abas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; background: var(--painel);
+.abas { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; background: var(--painel);
   border: 1px solid var(--borda); border-radius: 10px; padding: 4px; margin: 10px 0 6px; position: sticky; top: -14px; z-index: 2; }
 .abas button { background: transparent; border: 0; color: var(--suave); padding: 7px 4px; font-size: 12px; }
 .abas button.ativa { background: var(--painel-3); color: var(--texto); box-shadow: inset 0 -2px 0 var(--laranja); }
@@ -280,3 +280,20 @@ kbd { font: 600 10.5px "Montserrat"; background: var(--painel-3); border: 1px so
   backdrop-filter: blur(6px); font-size: 12px; }
 .btn-comparar.ativa { background: var(--botao); color: #1c0c00; border-color: transparent; }
 .tira img.ajustada { border-bottom: 4px solid var(--laranja); }
+
+/* ------------------------------------------------------------------ corte */
+.geo-botoes { margin-top: 10px; gap: 6px; }
+.geo-botoes button { flex: 1; }
+.corte-caixa { position: absolute; z-index: 4; border: 1px solid #fff; cursor: move; touch-action: none;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, .55); }
+.corte-caixa::before, .corte-caixa::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  border: solid rgba(255, 255, 255, .35); }
+.corte-caixa::before { border-width: 0 1px; left: 33.33%; right: 33.33%; }
+.corte-caixa::after { border-width: 1px 0; top: 33.33%; bottom: 33.33%; }
+.corte-caixa i { position: absolute; width: 16px; height: 16px; border: 3px solid var(--laranja); }
+.corte-caixa i[data-h="nw"] { left: 0; top: 0; border-right: 0; border-bottom: 0; cursor: nwse-resize; }
+.corte-caixa i[data-h="ne"] { right: 0; top: 0; border-left: 0; border-bottom: 0; cursor: nesw-resize; }
+.corte-caixa i[data-h="sw"] { left: 0; bottom: 0; border-right: 0; border-top: 0; cursor: nesw-resize; }
+.corte-caixa i[data-h="se"] { right: 0; bottom: 0; border-left: 0; border-top: 0; cursor: nwse-resize; }
+.comparar.cortando { overflow: hidden; }
+.comparar.cortando .alca, .comparar.cortando .rotulo { display: none; }

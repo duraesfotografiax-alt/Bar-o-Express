@@ -119,15 +119,17 @@ def processar_foto(origem: str, destino: str, ajustes: dict, opcoes: dict,
     ajustes, ajuste_auto = aplicar_auto(ajustes, origem)
     ajuste_ia = {**ajuste_ia, **ajuste_auto}
     analise = analisar(carregar_reduzida(origem))
+    from .geometria import exif_sem_rotacao, orientar
+
     with Image.open(origem) as img:
         extras = {}
         if img.info.get("exif"):
-            extras["exif"] = img.info["exif"]
+            extras["exif"] = exif_sem_rotacao(img.info["exif"])   # os pixels já saem em pé
         if img.info.get("icc_profile"):
             extras["icc_profile"] = img.info["icc_profile"]
         if img.info.get("dpi"):
             extras["dpi"] = img.info["dpi"]
-        editada = aplicar(img.convert("RGB"), ajustes, analise, carregar_lut(ajustes))
+        editada = aplicar(orientar(img).convert("RGB"), ajustes, analise, carregar_lut(ajustes))
 
     temporario = destino + ".parcial"
     editada.save(temporario, "JPEG", quality=int(opcoes.get("qualidade", 95)),
