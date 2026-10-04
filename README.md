@@ -142,6 +142,21 @@ precisam ser treinados de novo para ganhar isso.
 deitada).
 - Fotos feitas com a câmera em pé agora aparecem e saem em pé.
 
+### Remover objeto (aba Retoque)
+
+Pinte por cima do que quer tirar (copo na mesa, fio, interruptor, pessoa ao fundo). Ao soltar o
+pincel, a IA **LaMa** (vem junto no programa, roda no computador, sem internet) preenche a área com
+o que estaria atrás: parede, toalha, chão, decoração. Manchas pequenas são resolvidas na hora;
+objetos maiores levam alguns segundos. **Desfazer** tira o último traço. Vale por foto e entra na
+exportação.
+
+### Grade (selecionar e remover fotos)
+
+O botão **▦ Grade** (tecla **G**) mostra todas as fotos do evento em miniatura. Clique para
+selecionar, **Ctrl** ou **Shift** para várias, **Ctrl+A** todas. **X** (ou Delete) tira as
+selecionadas da entrega e **U** traz de volta. O arquivo original **não é apagado**: a foto só não é
+exportada. O filtro mostra todas, só as que vão ou só as removidas. Dois cliques abrem a foto.
+
 ### Botão Auto (como o do Lightroom)
 
 Na aba **Básico**, o botão **Auto** acerta cada foto sozinha, sem treino: balanço de branco pelo

@@ -67,10 +67,20 @@ def main(argv=None):
     proc.add_argument("--manter-nomes", action="store_true")
     proc.add_argument("--web", action="store_true", help="gera também versão 2048 px")
     proc.add_argument("--processos", type=int)
+    testar_ia = sub.add_parser("_testar_ia", help=argparse.SUPPRESS)
+    testar_ia.add_argument("--saida", required=True)
     escolher = sub.add_parser("_escolher", help=argparse.SUPPRESS)
     escolher.add_argument("tipo", choices=["pasta", "lut", "lightroom", "json"])
     escolher.add_argument("--saida")
     args = parser.parse_args(argv)
+
+    if args.comando == "_testar_ia":   # usado no teste do .exe: o modelo do Remover objeto abre?
+        from .remover import caminho_modelo, sessao_ia
+
+        s = sessao_ia()
+        with open(args.saida, "w", encoding="utf-8") as f:
+            f.write(f"modelo={caminho_modelo()} carregado={s is not None}\n")
+        return 0 if s is not None else 3
 
     if args.comando == "_escolher":
         return escolher_com_janela(args.tipo, args.saida)

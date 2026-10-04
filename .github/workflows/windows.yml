@@ -75,8 +75,15 @@ jobs:
           pyinstaller editalote_app.py --name DuraesApp --noconfirm --onedir --windowed
           --icon editalote/estatico/marca/icone.ico
           --add-data "editalote/estatico;editalote/estatico"
-          --collect-all webview
+          --collect-all webview --collect-binaries onnxruntime
           --hidden-import tkinter --hidden-import tkinter.filedialog
+
+      - name: Baixar o modelo de IA do Remover objeto (LaMa)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/DuraesApp/modelos | Out-Null
+          Invoke-WebRequest -Uri https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp32.onnx -OutFile dist/DuraesApp/modelos/lama_fp32.onnx
+          (Get-Item dist/DuraesApp/modelos/lama_fp32.onnx).Length
 
       - name: Montar a pasta para download
         shell: pwsh
@@ -138,6 +145,17 @@ jobs:
           if ((Get-ChildItem saida-pares -Filter *.jpg).Count -ne 12) { exit 1 }
           Get-Content saida-pares/relatorio.csv -TotalCount 3
           Remove-Item -Recurse dist/DuraesApp/presets/estilos, dist/DuraesApp/presets/pares.json, dist/DuraesApp/duraesapp.log
+
+      - name: Testar o Remover objeto (IA) dentro do .exe
+        shell: pwsh
+        run: |
+          '{"nome": "Remover", "auto_exposicao": 0, "auto_balanco_branco": 0, "remover": [{"p": [[0.5, 0.4], [0.5, 0.6]], "r": 0.06}]}' | Out-File -Encoding utf8 remover.json
+          $p = Start-Process ./dist/DuraesApp/DuraesApp.exe -ArgumentList @("processar", "amostra", "saida-remover", "--preset", "remover.json", "--processos", "2") -Wait -PassThru
+          if ($p.ExitCode -ne 0) { exit 1 }
+          if ((Get-ChildItem saida-remover -Filter *.jpg).Count -ne 12) { exit 1 }
+          $p = Start-Process ./dist/DuraesApp/DuraesApp.exe -ArgumentList @("_testar_ia", "--saida", "ia.txt") -Wait -PassThru
+          Get-Content ia.txt
+          if ($p.ExitCode -ne 0) { Write-Host "O modelo de IA não carregou no .exe"; exit 1 }
 
       - name: Testar a janela do programa e a ligação com a tela
         shell: pwsh

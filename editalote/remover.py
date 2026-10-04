@@ -52,6 +52,9 @@ def sessao_ia():
             opcoes = ort.SessionOptions()
             opcoes.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
             _sessao = ort.InferenceSession(caminho, opcoes, providers=["CPUExecutionProvider"])
+            import logging
+
+            logging.getLogger("editalote.remover").info("modelo LaMa carregado: %s", caminho)
         except Exception:
             import logging
 
