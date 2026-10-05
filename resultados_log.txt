@@ -1,0 +1,4 @@
+modelo carregado: True
+entradas: [('image', ['batch', 3, 512, 512], 'tensor(float)'), ('mask', ['batch', 1, 512, 512], 'tensor(float)')]
+saídas: [('output', ['batch', 3, 512, 512], 'tensor(float)')]
+tempo: 4.27s
