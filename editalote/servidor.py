@@ -25,14 +25,13 @@ from .lote import OPCOES_PADRAO, Trabalho, resumo_pasta
 from .metadados import EXTENSOES
 from .processamento import AJUSTES_PADRAO, previa_jpeg
 
-if getattr(sys, "frozen", False):
-    # DuraesApp.exe: presets ficam ao lado do .exe (dá para editar e salvar novos)
-    RAIZ = os.path.dirname(sys.executable)
-    PASTA_ESTATICA = os.path.join(sys._MEIPASS, "editalote", "estatico")  # type: ignore[attr-defined]
-else:
-    RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    PASTA_ESTATICA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "estatico")
-PASTA_PRESETS = os.path.join(RAIZ, "presets")
+from . import caminhos
+
+caminhos.preparar()
+RAIZ = caminhos.PROGRAMA            # pasta do programa (log)
+DADOS = caminhos.DADOS              # configurações, projetos e estilos (não somem ao atualizar)
+PASTA_ESTATICA = caminhos.PASTA_ESTATICA
+PASTA_PRESETS = caminhos.PASTA_PRESETS
 
 app = Flask(__name__, static_folder=None)
 log = logging.getLogger("editalote")
@@ -329,7 +328,7 @@ def cancelar():
 
 # ------------------------------------------------ entrega para clientes (Google Drive)
 
-projetos = Projetos(RAIZ)
+projetos = Projetos(DADOS)
 _login: Login | None = None
 
 

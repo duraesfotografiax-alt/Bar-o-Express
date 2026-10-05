@@ -55,6 +55,9 @@ jobs:
 
   windows:
     runs-on: windows-latest
+    env:
+      # nos testes do .exe os dados ficam na própria pasta (os testes conferem os arquivos lá)
+      DURAES_DADOS: ${{ github.workspace }}\dist\DuraesApp
     steps:
       - uses: actions/checkout@v4
 

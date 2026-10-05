@@ -258,8 +258,14 @@ Faça isso uma vez, com a conta Google do estúdio:
    Google, ele avisa **"O Google não verificou este app"**: clique em **Avançado > Acessar Durães
    APP** e depois em **Continuar**. Pronto.
 
-Guarde o arquivo .json com cuidado e não o compartilhe. Os arquivos `google_cliente.json` e
-`google_token.json` ficam ao lado do programa; apagar o `google_token.json` desconecta a conta.
+Guarde o arquivo .json com cuidado e não o compartilhe. **O Google só deixa baixar o .json na hora
+em que o segredo é criado.** Se perder o arquivo: Google Cloud › APIs e serviços › Credenciais ›
+clique no cliente **Durães APP** › **Adicionar chave secreta** e baixe o JSON na janela que abre
+(ou crie um cliente novo, tipo App para computador, e clique em **Baixar JSON** na hora).
+
+Configurações, conexão com o Google, projetos e estilos treinados ficam em
+`%APPDATA%\DuraesApp` (fora da pasta do programa): **atualizar o Durães APP não apaga nada**.
+Apagar o `google_token.json` dessa pasta desconecta a conta.
 
 ## Seleção do álbum (aba Álbum)
 
