@@ -198,6 +198,18 @@ class Drive:
         """Com download bloqueado, quem tem o link só vê: o Drive esconde baixar/imprimir/copiar."""
         self._json("PATCH", f"{API}/files/{arquivo_id}", {"copyRequiresWriterPermission": not permitir})
 
+    def ler_arquivo(self, arquivo_id: str) -> bytes:
+        status, _, dados = self._chamar("GET", f"{API}/files/{arquivo_id}?alt=media")
+        if status != 200:
+            raise ErroDrive(f"Não consegui ler o arquivo no Drive ({status})")
+        return dados
+
+    def trocar_conteudo(self, arquivo_id: str, dados: bytes, tipo: str = "application/json"):
+        status, _, _ = self._chamar("PATCH", f"{UPLOAD}/{arquivo_id}?uploadType=media",
+                                    {"Content-Type": tipo}, dados)
+        if status not in (200, 201):
+            raise ErroDrive(f"Não consegui atualizar o arquivo no Drive ({status})")
+
     def mover_para_lixeira(self, arquivo_id: str):
         self._json("PATCH", f"{API}/files/{arquivo_id}", {"trashed": True})
 

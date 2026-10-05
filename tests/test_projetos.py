@@ -69,8 +69,13 @@ class DriveFalso:
                 meta.pop("_recebido")
             del self.sessoes[url]
             fid = self._novo_id()
-            self.arquivos[fid] = {**meta, "trashed": False, "tamanho": len(corpo)}
+            self.arquivos[fid] = {**meta, "trashed": False, "tamanho": len(corpo), "conteudo": corpo}
             return 200, {}, json.dumps({"id": fid}).encode()
+        if u.path.startswith("/upload/drive/v3/files/") and metodo == "PATCH":
+            self.arquivos[partes[5]]["conteudo"] = corpo
+            return 200, {}, b"{}"
+        if metodo == "GET" and q.get("alt") == "media":
+            return 200, {}, self.arquivos[partes[4]]["conteudo"]
         if u.path == "/drive/v3/files" and metodo == "POST":
             meta = json.loads(corpo)
             fid = self._novo_id()
@@ -251,3 +256,40 @@ def test_videos_tambem_vao_para_o_drive_em_partes(ambiente, monkeypatch):
     assert esperar(pj)["estado"] == "concluido"
     enviados = {a["name"]: a for a in falso.fotos_em(pj.obter(projeto["id"])["drive_pasta"])}
     assert enviados["Video_Cerimonia.MP4"]["tamanho"] == len(video)
+
+
+def test_album_selecao_do_cliente(ambiente, tmp_path):
+    pj, falso, fotos = ambiente
+    projeto = pj.criar("Casamento Ana e João", str(fotos))
+    with pytest.raises(ValueError):
+        pj.ativar_album(projeto["id"], 30)           # ainda não está no Drive
+    pj.enviar(projeto["id"])
+    assert esperar(pj)["estado"] == "concluido"
+    with pytest.raises(ValueError):
+        pj.configurar_seletor("https://exemplo.com/qualquer")
+    pj.configurar_seletor("https://script.google.com/macros/s/ABC/exec?x=1")
+    projeto = pj.ativar_album(projeto["id"], 3)
+    link = pj.link_album(projeto)
+    assert link.startswith("https://script.google.com/macros/s/ABC/exec?p=") and "l=3" in link
+    arquivo = projeto["album_arquivo"]
+    assert falso.arquivos[arquivo]["name"] == "selecao_album.json"
+    assert pj.ativar_album(projeto["id"], 4)["album_arquivo"] == arquivo     # não duplica
+
+    # o cliente escolhe na página (o Apps Script grava o arquivo)
+    falso.arquivos[arquivo]["conteudo"] = json.dumps(
+        {"fotos": ["Casamento_0003.jpg", "Casamento_0001.jpg"], "finalizado": True, "obs": "capa: 3"}).encode()
+    sel = pj.selecao_album(projeto["id"])
+    assert sel["fotos"] == ["Casamento_0003.jpg", "Casamento_0001.jpg"] and sel["finalizado"]
+    r = pj.separar_album(projeto["id"])
+    assert r["copiadas"] == 2 and not r["faltando"]
+    album = sorted(p.name for p in (fotos / "Álbum (seleção do cliente)").iterdir())
+    assert album == ["001_Casamento_0003.jpg", "002_Casamento_0001.jpg"]
+    # a pasta do álbum não volta para o Drive num novo envio
+    assert pj.obter(projeto["id"])["total"] == 7
+    from editalote.projetos import fotos_da_pasta
+    assert len(fotos_da_pasta(str(fotos))) == 7
+
+    assert not pj.reabrir_album(projeto["id"])["finalizado"]
+    assert json.loads(falso.arquivos[arquivo]["conteudo"])["finalizado"] is False
+    r = pj.separar_album(projeto["id"], ["casamento_0005.JPG", "nao_existe.jpg"])
+    assert r["copiadas"] == 1 and r["faltando"] == ["nao_existe.jpg"]

@@ -323,3 +323,10 @@ kbd { font: 600 10.5px "Montserrat"; background: var(--painel-3); border: 1px so
 /* ---------------------------------------------------------------- retoque */
 .pincel-tela { position: absolute; inset: 0; z-index: 4; cursor: crosshair; touch-action: none; }
 .comparar.pintando .alca, .comparar.pintando .rotulo { display: none; }
+
+/* ------------------------------------------------------------------ álbum */
+.passos-album { padding-left: 18px; margin: 8px 0; }
+.passos-album li { margin-bottom: 6px; }
+.passos-album a { color: var(--laranja-2); }
+.nomes-album { max-height: 140px; overflow-y: auto; word-break: break-word; }
+details.acoes { display: block; }

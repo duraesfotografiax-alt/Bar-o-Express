@@ -17,6 +17,7 @@
   <nav class="modos">
     <button class="ativo" data-modo="edicao" onclick="trocarModo('edicao')">Edição</button>
     <button data-modo="clientes" onclick="trocarModo('clientes')">Clientes</button>
+    <button data-modo="album" onclick="trocarModo('album')">Álbum</button>
   </nav>
   <nav class="passos" id="passos">
     <div class="passo atual" data-passo="1"><b>1</b>Fotos</div>
@@ -262,6 +263,38 @@
 </div>
 
 <!-- ====================================================== clientes (Google Drive) -->
+<div class="clientes" id="telaAlbum" style="display:none">
+  <aside class="lateral esq">
+    <section class="bloco-fixo">
+      <h3 class="titulo-cartao">Página de seleção</h3>
+      <p class="dica">O cliente escolhe as fotos do álbum numa página no celular ou no computador,
+        direto da pasta de entrega no Drive. Configuração única (uns 5 minutos), gratuita, na sua
+        conta Google:</p>
+      <ol class="dica passos-album">
+        <li><button class="contorno" onclick="copiarScript()">Copiar o código da página</button></li>
+        <li>Abra <a href="#" onclick="abrirLink('https://script.google.com/home/projects/create'); return false">script.google.com</a>
+          (novo projeto), apague o que estiver escrito, cole e clique em <b>Salvar</b>.</li>
+        <li><b>Implantar › Nova implantação</b> › tipo <b>App da Web</b>. Executar como: <b>Eu</b>.
+          Quem pode acessar: <b>Qualquer pessoa</b>. Implantar e autorizar (se aparecer "app não
+          verificado": Avançado › Acessar).</li>
+        <li>Copie a <b>URL do app da Web</b> (termina com /exec) e cole aqui:</li>
+      </ol>
+      <input type="text" id="urlSeletor" placeholder="https://script.google.com/macros/s/.../exec">
+      <button class="destaque" style="width:100%; margin-top:6px" onclick="salvarSeletor()">Salvar</button>
+      <p class="dica" id="seletorMsg"></p>
+    </section>
+  </aside>
+  <main class="lista-projetos">
+    <div class="cabecalho-lista">
+      <h2 class="titulo-pagina">Seleção do álbum</h2>
+      <span class="dica">Os projetos aparecem aqui depois de enviados ao Drive (aba Clientes).
+        Quando o cliente terminar, clique em <b>Separar fotos</b>: elas são copiadas, na ordem da
+        escolha, para a pasta "Álbum (seleção do cliente)" dentro da pasta do evento.</span>
+    </div>
+    <div id="albuns"></div>
+  </main>
+</div>
+
 <div class="clientes" id="telaClientes" style="display:none">
   <aside class="lateral esq">
     <section class="bloco-fixo" id="cartaoDrive">

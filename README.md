@@ -261,6 +261,23 @@ Faça isso uma vez, com a conta Google do estúdio:
 Guarde o arquivo .json com cuidado e não o compartilhe. Os arquivos `google_cliente.json` e
 `google_token.json` ficam ao lado do programa; apagar o `google_token.json` desconecta a conta.
 
+## Seleção do álbum (aba Álbum)
+
+O cliente escolhe as fotos do álbum numa página no celular ou no computador, a partir da pasta de
+entrega no Drive. A escolha é salva sozinha; no fim ele toca em **Enviar seleção**.
+
+**Configuração única (uns 5 minutos, gratuita):** na aba **Álbum**, clique em **Copiar o código da
+página**, abra o script.google.com (novo projeto), apague o que estiver escrito, cole e salve.
+Depois **Implantar › Nova implantação › App da Web** (Executar como: Eu · Quem pode acessar:
+Qualquer pessoa), autorize e cole a **URL do app da Web** (termina com /exec) no Durães APP.
+
+**Para cada cliente:** depois de enviar as fotos ao Drive (aba Clientes), na aba Álbum escolha
+quantas fotos vão no álbum (ou deixe sem limite), clique em **Liberar seleção** e mande o link
+(Copiar link ou WhatsApp). Em **↻ Ver escolha** aparece quantas fotos o cliente marcou e a
+observação dele. **Separar fotos do álbum** copia as escolhidas, na ordem da escolha, para a pasta
+"Álbum (seleção do cliente)" dentro da pasta do evento. Se o cliente mandar os nomes pelo
+WhatsApp, use **Colar lista de nomes**. **Deixar o cliente alterar** reabre a seleção enviada.
+
 ## Entrega na nuvem
 
 No bloco **4. Entrega na nuvem** da tela, escolha a pasta do OneDrive, Google Drive para

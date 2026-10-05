@@ -443,6 +443,64 @@ def projetos_excluir(pid):
     return jsonify({"ok": True})
 
 
+# ---------------------------------------------------------------------- álbum
+@app.get("/api/album/config")
+def album_config():
+    return jsonify({"url": projetos.url_seletor()})
+
+
+@app.post("/api/album/config")
+def album_config_salvar():
+    try:
+        projetos.configurar_seletor((request.json or {}).get("url", ""))
+    except ValueError as erro:
+        return jsonify({"erro": str(erro)}), 400
+    return jsonify({"ok": True})
+
+
+@app.get("/api/album/script")
+def album_script():
+    with open(os.path.join(os.path.dirname(__file__), "estatico", "seletor_album.gs"), encoding="utf-8") as f:
+        return jsonify({"codigo": f.read()})
+
+
+def _resposta_album(pid: str, acao):
+    try:
+        resultado = acao()
+        projeto = projetos.obter(pid)
+        return jsonify({**(resultado if isinstance(resultado, dict) else {}),
+                        "link": projetos.link_album(projeto), "projeto": projeto})
+    except (ValueError, ErroDrive, OSError) as erro:
+        return jsonify({"erro": str(erro)}), 400
+    except KeyError:
+        return jsonify({"erro": "Projeto não encontrado"}), 404
+
+
+@app.post("/api/projetos/<pid>/album")
+def album_ativar(pid):
+    return _resposta_album(pid, lambda: projetos.ativar_album(pid, (request.json or {}).get("limite", 0)) and {})
+
+
+@app.get("/api/projetos/<pid>/album")
+def album_selecao(pid):
+    return _resposta_album(pid, lambda: {"selecao": projetos.selecao_album(pid)})
+
+
+@app.post("/api/projetos/<pid>/album/reabrir")
+def album_reabrir(pid):
+    return _resposta_album(pid, lambda: {"selecao": projetos.reabrir_album(pid)})
+
+
+@app.post("/api/projetos/<pid>/album/separar")
+def album_separar(pid):
+    nomes = (request.json or {}).get("nomes")
+    if isinstance(nomes, str):   # lista colada (WhatsApp): um nome por linha, vírgula ou espaço
+        import re
+
+        nomes = [n for n in re.split(r"[\s,;]+", nomes) if n]
+    return _resposta_album(pid, lambda: projetos.separar_album(pid, nomes))
+
+
 @app.get("/api/projetos/envio")
 def projetos_envio():
     return jsonify(projetos.status_envio())

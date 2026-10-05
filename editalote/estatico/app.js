@@ -1084,9 +1084,11 @@ function trocarModo(modo) {
   document.querySelectorAll(".modos button").forEach(b => b.classList.toggle("ativo", b.dataset.modo === modo));
   $("telaEdicao").style.display = modo === "edicao" ? "" : "none";
   $("telaClientes").style.display = modo === "clientes" ? "" : "none";
+  $("telaAlbum").style.display = modo === "album" ? "" : "none";
   $("passos").style.display = modo === "edicao" ? "" : "none";
   $("btnProcessar").style.display = modo === "edicao" ? "" : "none";
   if (modo === "clientes") { atualizarDrive(); carregarProjetos(); acompanharEnvio(); }
+  if (modo === "album") carregarAlbuns();
 }
 async function atualizarDrive() {
   const e = await api("/api/drive/estado");
@@ -1239,3 +1241,115 @@ ligarCurva();
 carregarNuvem();
 carregarPresetsLR();
 api("/api/padroes").then(r => { padroes = r.ajustes; carregarPresets(); });
+
+
+// ------------------------------------------------------------------ álbum (seleção do cliente)
+async function copiarScript() {
+  const r = await api("/api/album/script");
+  try { await navigator.clipboard.writeText(r.codigo); aviso("Código copiado. Cole no script.google.com."); }
+  catch (e) {
+    const t = document.createElement("textarea"); t.value = r.codigo; document.body.appendChild(t);
+    t.select(); document.execCommand("copy"); t.remove(); aviso("Código copiado. Cole no script.google.com.");
+  }
+}
+async function salvarSeletor() {
+  try {
+    await api("/api/album/config", {url: $("urlSeletor").value.trim()});
+    $("seletorMsg").innerHTML = '<span class="ok">● Página de seleção configurada</span>';
+    carregarAlbuns();
+  } catch (e) { $("seletorMsg").innerHTML = `<span class="erro">${esc(e.message)}</span>`; }
+}
+async function carregarAlbuns() {
+  const cfg = await api("/api/album/config");
+  $("urlSeletor").value = cfg.url || "";
+  if (cfg.url) $("seletorMsg").innerHTML = '<span class="ok">● Página de seleção configurada</span>';
+  const lista = (await api("/api/projetos")).filter(p => p.drive_pasta);
+  window._albuns = Object.fromEntries(lista.map(p => [p.id, p]));
+  if (!lista.length) {
+    $("albuns").innerHTML = `<div class="vazio-projetos">Nenhum projeto no Drive ainda. Envie um evento na aba
+      <b>Clientes</b> e ele aparece aqui.</div>`;
+    return;
+  }
+  $("albuns").innerHTML = lista.map(p => cartaoAlbum(p, null)).join("");
+  for (const p of lista) if (p.album_arquivo && cfg.url) atualizarAlbum(p.id, true);
+}
+function cartaoAlbum(p, link) {
+  const s = p.album_selecao || {fotos: []};
+  const lim = p.album_limite || 0;
+  const selo = !p.album_arquivo ? `<span class="selo-estado">Seleção não liberada</span>`
+    : s.finalizado ? `<span class="selo-estado pronto">Cliente enviou: ${s.fotos.length} fotos</span>`
+    : `<span class="selo-estado enviando">Escolhendo: ${s.fotos.length}${lim ? " de " + lim : ""}</span>`;
+  return `<div class="projeto" data-album="${p.id}">
+    <div class="topo-projeto"><div><h4>${esc(p.nome)}</h4>
+      <div class="sub">${p.total} fotos no Drive${s.atualizado ? " · atualizado " + new Date(s.atualizado).toLocaleString("pt-BR") : ""}</div></div>
+      ${selo}</div>
+    <div class="acoes">
+      <label class="dica">Fotos no álbum</label>
+      <input type="number" min="0" step="1" value="${lim || ""}" placeholder="sem limite" style="width:110px" id="lim_${p.id}">
+      <button class="contorno" onclick="liberarAlbum('${p.id}')">${p.album_arquivo ? "Atualizar limite" : "Liberar seleção"}</button>
+      ${p.album_arquivo ? `<button onclick="atualizarAlbum('${p.id}')">↻ Ver escolha</button>` : ""}
+    </div>
+    ${link ? `<div class="acoes">
+      <input class="link" type="text" readonly value="${esc(link)}" onclick="this.select()">
+      <button onclick="copiarLinkAlbum('${p.id}')">Copiar link</button>
+      <button onclick="whatsappAlbum('${p.id}')">WhatsApp</button>
+      <button class="fantasma" onclick="abrirLink(window._linksAlbum['${p.id}'])">Abrir</button></div>` : ""}
+    ${s.fotos.length ? `<details class="acoes"><summary class="dica">Ver as ${s.fotos.length} fotos escolhidas${s.obs ? " · observação do cliente" : ""}</summary>
+      ${s.obs ? `<p class="dica"><b>Observação:</b> ${esc(s.obs)}</p>` : ""}
+      <p class="dica nomes-album">${s.fotos.map(esc).join(", ")}</p></details>` : ""}
+    <div class="acoes">
+      ${s.fotos.length ? `<button class="destaque" onclick="separarAlbum('${p.id}')">Separar fotos do álbum</button>` : ""}
+      ${s.finalizado ? `<button class="fantasma" onclick="reabrirAlbum('${p.id}')">Deixar o cliente alterar</button>` : ""}
+      <span style="margin-left:auto"></span>
+      <button class="fantasma" onclick="colarListaAlbum('${p.id}')" title="Se o cliente mandou os nomes por WhatsApp">Colar lista de nomes</button>
+    </div>
+    <p class="dica" id="albumMsg_${p.id}"></p></div>`;
+}
+window._linksAlbum = {};
+function redesenharAlbum(r) {
+  window._albuns[r.projeto.id] = r.projeto;
+  if (r.link) window._linksAlbum[r.projeto.id] = r.link;
+  const el = document.querySelector(`[data-album="${r.projeto.id}"]`);
+  if (el) el.outerHTML = cartaoAlbum(r.projeto, window._linksAlbum[r.projeto.id]);
+}
+async function liberarAlbum(id) {
+  try {
+    const r = await api(`/api/projetos/${id}/album`, {limite: +$("lim_" + id).value || 0});
+    redesenharAlbum(r);
+    if (!r.link) aviso("Seleção liberada. Configure a página de seleção ao lado para gerar o link.", true);
+    else aviso("Link de seleção pronto. Mande para o cliente.");
+  } catch (e) { aviso(e.message, true); }
+}
+async function atualizarAlbum(id, silencioso) {
+  try { redesenharAlbum(await api(`/api/projetos/${id}/album`)); if (!silencioso) aviso("Escolha do cliente atualizada"); }
+  catch (e) { if (!silencioso) aviso(e.message, true); }
+}
+async function reabrirAlbum(id) {
+  if (!confirm("Liberar para o cliente alterar a seleção de novo?")) return;
+  try { redesenharAlbum(await api(`/api/projetos/${id}/album/reabrir`, {})); aviso("O cliente pode alterar a seleção"); }
+  catch (e) { aviso(e.message, true); }
+}
+async function separarAlbum(id, nomes) {
+  try {
+    const r = await api(`/api/projetos/${id}/album/separar`, nomes ? {nomes} : {});
+    redesenharAlbum(r);
+    $("albumMsg_" + id).innerHTML = `${r.copiadas} fotos copiadas para <b>${esc(r.pasta)}</b>` +
+      (r.faltando.length ? `<br><span class="erro">Não achei na pasta do evento: ${r.faltando.map(esc).join(", ")}</span>` : "");
+    aviso(`${r.copiadas} fotos separadas para o álbum`);
+  } catch (e) { aviso(e.message, true); }
+}
+function colarListaAlbum(id) {
+  const t = prompt("Cole os nomes das fotos (um por linha ou separados por vírgula):");
+  if (t && t.trim()) separarAlbum(id, t);
+}
+function mensagemAlbum(id) {
+  const p = window._albuns[id], lim = p.album_limite;
+  return `Olá! Chegou a hora de escolher as fotos do álbum de *${p.nome}* 📖\n` +
+    `${lim ? `Escolha ${lim} fotos` : "Escolha suas fotos favoritas"} neste link (funciona no celular):\n${window._linksAlbum[id]}\n` +
+    `Toque no círculo de cada foto para marcar e, no fim, em *Enviar seleção*.\n— Durães Fotografia`;
+}
+async function copiarLinkAlbum(id) {
+  try { await navigator.clipboard.writeText(mensagemAlbum(id)); aviso("Mensagem com o link copiada"); }
+  catch (e) { aviso("Não consegui copiar. Selecione o link e copie.", true); }
+}
+function whatsappAlbum(id) { abrirLink("https://wa.me/?text=" + encodeURIComponent(mensagemAlbum(id))); }

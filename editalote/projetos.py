@@ -27,7 +27,9 @@ log = logging.getLogger("editalote.projetos")
 
 PASTA_RAIZ_DRIVE = "Durães APP · Clientes"
 LADO_LEVE = 3000
-IGNORAR_PASTAS = {"_revisar_desfocadas", "web"}
+PASTA_ALBUM = "Álbum (seleção do cliente)"
+ARQUIVO_SELECAO = "selecao_album.json"
+IGNORAR_PASTAS = {"_revisar_desfocadas", "web", PASTA_ALBUM}
 
 
 def _ler(caminho: str, padrao):
@@ -74,6 +76,7 @@ class Projetos:
         self.arquivo = os.path.join(raiz, "projetos.json")
         self.arquivo_cliente = os.path.join(raiz, "google_cliente.json")
         self.arquivo_token = os.path.join(raiz, "google_token.json")
+        self.arquivo_album = os.path.join(raiz, "album.json")
         self._trava = threading.RLock()
         self._envio: Envio | None = None
 
@@ -182,6 +185,83 @@ class Projetos:
             dados = self._dados()
             dados["projetos"] = [p for p in dados["projetos"] if p["id"] != pid]
             self._gravar(dados)
+
+    # ---------------------------------------------------------------- álbum
+    # O cliente escolhe as fotos numa página do Google Apps Script (seletor_album.gs, publicado na
+    # conta do estúdio). A escolha fica em selecao_album.json, que o Durães APP cria na pasta do
+    # cliente (por isso consegue ler, mesmo só com a permissão drive.file).
+    def url_seletor(self) -> str:
+        return _ler(self.arquivo_album, {}).get("url", "")
+
+    def configurar_seletor(self, url: str):
+        url = url.strip()
+        if url and not (url.startswith("https://script.google.com/") and "/exec" in url):
+            raise ValueError("Cole a \"URL do app da Web\" do Apps Script (começa com "
+                             "https://script.google.com/ e termina com /exec).")
+        salvar_json(self.arquivo_album, {"url": url.split("?")[0]})
+
+    def ativar_album(self, pid: str, limite: int) -> dict:
+        projeto = self.obter(pid)
+        if not projeto.get("drive_pasta"):
+            raise ValueError("Envie as fotos para o Drive antes de liberar a seleção do álbum")
+        drive = self.drive()
+        arquivo = projeto.get("album_arquivo")
+        if not arquivo or not drive.existe(arquivo):
+            arquivo = drive.enviar_arquivo(ARQUIVO_SELECAO, projeto["drive_pasta"], True, dados=b"{}")
+        return self._atualizar(pid, album_arquivo=arquivo, album_limite=max(0, int(limite or 0)))
+
+    def link_album(self, projeto: dict) -> str:
+        url = self.url_seletor()
+        if not url or not projeto.get("album_arquivo"):
+            return ""
+        import urllib.parse
+
+        return url + "?" + urllib.parse.urlencode({
+            "p": projeto["drive_pasta"], "s": projeto["album_arquivo"], "n": projeto["nome"],
+            "l": projeto.get("album_limite") or 0})
+
+    def selecao_album(self, pid: str) -> dict:
+        import json
+
+        projeto = self.obter(pid)
+        if not projeto.get("album_arquivo"):
+            return {"fotos": [], "finalizado": False}
+        try:
+            dados = json.loads(self.drive().ler_arquivo(projeto["album_arquivo"]) or b"{}")
+        except ValueError:
+            dados = {}
+        selecao = {"fotos": [str(n) for n in dados.get("fotos", [])], "finalizado": bool(dados.get("finalizado")),
+                   "obs": str(dados.get("obs", "")), "atualizado": dados.get("atualizado", "")}
+        self._atualizar(pid, album_selecao=selecao)
+        return selecao
+
+    def reabrir_album(self, pid: str) -> dict:
+        import json
+
+        selecao = {**self.selecao_album(pid), "finalizado": False}
+        self.drive().trocar_conteudo(self.obter(pid)["album_arquivo"], json.dumps(selecao).encode())
+        self._atualizar(pid, album_selecao=selecao)
+        return selecao
+
+    def separar_album(self, pid: str, nomes: list[str] | None = None) -> dict:
+        """Copia as fotos escolhidas (pelo nome) para a pasta "Álbum (seleção do cliente)"."""
+        projeto = self.obter(pid)
+        if nomes is None:
+            nomes = (projeto.get("album_selecao") or {}).get("fotos", [])
+        nomes = [os.path.basename(n.strip()) for n in nomes if n and n.strip()]
+        por_nome = {os.path.basename(f).lower(): f for f in fotos_da_pasta(projeto["pasta"])}
+        destino = os.path.join(projeto["pasta"], PASTA_ALBUM)
+        os.makedirs(destino, exist_ok=True)
+        copiadas, faltando = 0, []
+        for n, nome in enumerate(nomes, 1):
+            origem = por_nome.get(nome.lower())
+            if not origem:
+                faltando.append(nome)
+                continue
+            # numera na ordem da escolha do cliente, mantendo o nome original
+            shutil.copy2(origem, os.path.join(destino, f"{n:03d}_{os.path.basename(origem)}"))
+            copiadas += 1
+        return {"pasta": destino, "copiadas": copiadas, "faltando": faltando}
 
     # ---------------------------------------------------------------- envio
     def _pasta_raiz(self, drive: Drive) -> str:
