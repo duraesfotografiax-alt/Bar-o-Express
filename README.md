@@ -21,6 +21,11 @@ Programa de PC para **entregar fotos e vídeos aos clientes pelo Google Drive**,
    **Abrir**, **Renomear** e **Mover para a lixeira** (ou tecla **Delete**). **Backspace** volta uma
    pasta. Pastas já vistas abrem na hora, e passar o mouse numa pasta já começa a carregá-la.
 
+   **Mover:** arraste as fotos/pastas selecionadas para cima de outra pasta (ou para um nome do
+   caminho lá em cima, para subir de nível), ou use **📂 Mover para…** na barra de seleção.
+   **Do computador:** arraste fotos e vídeos do Explorador do Windows para dentro da pasta aberta
+   (ou em cima de uma pasta) e eles sobem para o Drive (3 por vez, com barra de andamento).
+
    **Ordem e busca:** em cima da lista, escolha **Nome (A → Z)**, **Nome (Z → A)**, **Modificadas:
    mais recentes** ou **mais antigas** (o programa lembra a escolha). A caixa **Buscar** filtra pelo
    nome na pasta aberta (sem diferença de acento ou maiúscula). Cada pasta mostra a data da última

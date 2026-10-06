@@ -105,7 +105,10 @@ class DriveFalso:
             return 200, {}, json.dumps({"id": fid, "trashed": a["trashed"], "name": a["name"],
                                         "mimeType": a.get("mimeType", ""), "parents": a.get("parents", [])}).encode()
         if metodo == "PATCH":
-            mudanca = json.loads(corpo)
+            if q.get("addParents"):
+                pais = [x for x in self.arquivos[fid].get("parents", []) if x != q.get("removeParents")]
+                self.arquivos[fid]["parents"] = pais + [q["addParents"]]
+            mudanca = json.loads(corpo or b"{}")
             # como o Google: essa opção não existe para pastas
             if "copyRequiresWriterPermission" in mudanca and self.arquivos[fid].get("mimeType") == drive_mod.PASTA_MIME:
                 return 400, {}, json.dumps({"error": {"code": 400, "message": "Bad Request",
@@ -383,3 +386,29 @@ def test_meu_drive_e_trocar_pasta_principal(ambiente, monkeypatch):
     assert c.post(f"/api/pastas/{antiga}/principal", json={"empresa": "duraes"}).status_code == 200
     r = c.get("/api/pastas?empresa=duraes").get_json()
     assert r["raiz"] == antiga and r["pasta"]["name"] == "DURÃES 2026"
+
+
+def test_mover_e_receber_arquivo_arrastado(ambiente, monkeypatch):
+    import io
+
+    from editalote import servidor
+
+    pj, falso, fotos = ambiente
+    monkeypatch.setattr(servidor, "projetos", pj)
+    c = servidor.app.test_client()
+    raiz = c.get("/api/pastas?empresa=duraes").get_json()["raiz"]
+    destino = c.post("/api/pastas", json={"nome": "Selecionadas", "pai": raiz}).get_json()["id"]
+    # arrastar do computador
+    for nome in ("A.jpg", "B.mp4"):
+        r = c.post(f"/api/pastas/{raiz}/arquivo?empresa=duraes",
+                   data={"arquivo": (io.BytesIO(b"x" * 500), nome)}, content_type="multipart/form-data")
+        assert r.status_code == 200, r.get_json()
+    itens = {i["nome"]: i["id"] for i in c.get("/api/pastas?empresa=duraes").get_json()["itens"]}
+    assert {"A.jpg", "B.mp4", "Selecionadas"} <= set(itens)
+    # mover as duas para dentro da pasta
+    r = c.post("/api/pastas/mover", json={"ids": [itens["A.jpg"], itens["B.mp4"]], "origem": raiz,
+                                         "destino": destino})
+    assert r.get_json()["quantos"] == 2
+    dentro = [i["nome"] for i in c.get(f"/api/pastas?empresa=duraes&id={destino}").get_json()["itens"]]
+    assert sorted(dentro) == ["A.jpg", "B.mp4"]
+    assert c.post("/api/pastas/mover", json={"ids": [destino], "origem": raiz, "destino": destino}).status_code == 400

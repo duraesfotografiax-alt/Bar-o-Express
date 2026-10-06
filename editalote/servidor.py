@@ -580,6 +580,52 @@ def pastas_lixeira_varias():
         return _erro(erro)
 
 
+@app.post("/api/pastas/mover")
+def pastas_mover():
+    """Move pastas/fotos/vídeos de uma pasta (origem) para outra (destino)."""
+    dados = request.json or {}
+    ids = [str(i) for i in dados.get("ids") or []]
+    origem, destino = str(dados.get("origem") or ""), str(dados.get("destino") or "")
+    if not ids or not origem or not destino:
+        return jsonify({"erro": "Nada para mover"}), 400
+    if destino in ids:
+        return jsonify({"erro": "Uma pasta não pode ir para dentro dela mesma"}), 400
+    protegidas = {projetos.raiz_empresa(e) for e in EMPRESAS}
+    if any(i in protegidas for i in ids):
+        return jsonify({"erro": "A pasta principal de uma empresa não pode ser movida"}), 400
+    try:
+        drive = projetos.drive()
+        with ThreadPoolExecutor(max_workers=4) as ex:
+            list(ex.map(lambda i: drive.mover(i, origem, destino), ids))
+        return jsonify({"ok": True, "quantos": len(ids)})
+    except ErroDrive as erro:
+        return _erro(erro)
+
+
+@app.post("/api/pastas/<pasta_id>/arquivo")
+def pastas_receber_arquivo(pasta_id):
+    """Recebe um arquivo arrastado do computador para a pasta aberta e envia ao Drive."""
+    arquivo = request.files.get("arquivo")
+    if not arquivo or not arquivo.filename:
+        return jsonify({"erro": "Nenhum arquivo"}), 400
+    nome = os.path.basename(arquivo.filename.replace("\\", "/"))
+    projeto = projetos.projeto_da_pasta(pasta_id)
+    permitir = bool(projeto and projeto.get("permitir_download"))
+    temporario = tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(nome)[1])
+    try:
+        arquivo.save(temporario)
+        temporario.close()
+        fid = projetos.drive().enviar_arquivo(nome, pasta_id, permitir, caminho=temporario.name)
+        return jsonify({"ok": True, "id": fid})
+    except (ErroDrive, OSError) as erro:
+        return _erro(erro)
+    finally:
+        try:
+            os.remove(temporario.name)
+        except OSError:
+            pass
+
+
 @app.delete("/api/pastas/<pasta_id>")
 def pastas_lixeira(pasta_id):
     try:

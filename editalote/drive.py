@@ -309,6 +309,11 @@ class Drive:
             if p.get("type") == "anyone":
                 self._json("DELETE", f"{API}/files/{arquivo_id}/permissions/{p['id']}")
 
+    def mover(self, arquivo_id: str, de: str, para: str):
+        self._json("PATCH", f"{API}/files/{arquivo_id}?addParents={para}&removeParents={de}"
+                            "&supportsAllDrives=true", {})
+        self.esquecer(arquivo_id)
+
     def renomear(self, arquivo_id: str, nome: str):
         self._json("PATCH", f"{API}/files/{arquivo_id}", {"name": nome})
         self.esquecer(arquivo_id)

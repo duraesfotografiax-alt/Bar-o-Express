@@ -135,15 +135,26 @@
       <button class="fantasma" onclick="abrirPasta(dadosPasta && dadosPasta.pasta.id)" title="Atualizar">↻</button>
     </div>
     <p class="dica" id="driveInfo"></p>
-    <div class="barra-selecao" id="barraSelecao" style="display:none">
+    <div class="barra-selecao" id="barraSelecao" style="visibility:hidden">
       <b id="qtdSelecao"></b>
       <button id="selAbrir" onclick="abrirSelecionada()">Abrir</button>
       <button id="selRenomear" onclick="renomearSelecionada()">Renomear</button>
+      <button onclick="abrirMover()">📂 Mover para…</button>
       <button class="perigo" onclick="lixeiraSelecionadas()">🗑 Mover para a lixeira</button>
       <button class="fantasma" onclick="limparSelecao()">Cancelar</button>
       <span class="dica">Ctrl ou Shift: selecionar vários · Delete: lixeira · Enter: abrir</span>
     </div>
     <div class="drive-grade" id="driveGrade"></div>
+    <div class="envio-arrastado" id="envioArrastado" style="display:none"><span id="envioArrastadoMsg"></span>
+      <div class="barra"><div id="envioArrastadoBarra"></div></div></div>
+    <div class="soltar-aqui" id="soltarAqui">Solte aqui para enviar para <b id="soltarNome"></b></div>
+    <div class="janela-mover" id="janelaMover" style="display:none">
+      <div class="caixa-mover">
+        <h3 class="titulo-cartao">Mover para…</h3>
+        <div id="listaMover"></div>
+        <div class="linha" style="justify-content:flex-end; margin-top:10px"><button class="fantasma" onclick="fecharMover()">Cancelar</button></div>
+      </div>
+    </div>
   </main>
 </div>
 

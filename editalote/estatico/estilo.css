@@ -409,3 +409,19 @@ button.perigo { color: var(--erro); }
 #ordemDrive { width: auto; }
 .item-drive.pasta .nome-pasta { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
 .item-drive.pasta .nome-pasta small { color: var(--fraco); font-size: 11px; }
+/* arrastar e soltar */
+.alvo-soltar { outline: 2px dashed var(--laranja); outline-offset: 2px; background: var(--painel-3) !important; }
+#trilha a.alvo-soltar { border-radius: 6px; padding: 2px 6px; }
+.soltar-aqui { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 30; display: none;
+  padding: 12px 22px; border-radius: 999px; background: var(--botao); color: #1c0c00; font-weight: 600;
+  box-shadow: var(--sombra); pointer-events: none; }
+.soltar-aqui.visivel { display: block; }
+.envio-arrastado { position: fixed; right: 22px; bottom: 22px; z-index: 30; width: 320px; padding: 12px 14px;
+  background: var(--painel-2); border: 1px solid var(--borda); border-radius: 12px; box-shadow: var(--sombra); font-size: 13px; }
+.janela-mover { position: fixed; inset: 0; z-index: 40; background: rgba(0, 0, 0, .6); display: flex;
+  align-items: center; justify-content: center; }
+.caixa-mover { width: min(440px, 92vw); max-height: 70vh; overflow-y: auto; padding: 18px; border-radius: 14px;
+  background: var(--painel); border: 1px solid var(--borda); box-shadow: var(--sombra); }
+.opcao-mover { display: block; width: 100%; text-align: left; margin: 4px 0; background: var(--painel-2); }
+.opcao-mover:hover { border-color: var(--laranja); }
+.opcao-mover small { color: var(--fraco); }

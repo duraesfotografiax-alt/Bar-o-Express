@@ -1330,7 +1330,7 @@ function desenharPasta() {
   if (!d) return;
   $("ordemDrive").value = ordemDrive;
   $("trilha").innerHTML = d.caminho.map((c, i) => i === d.caminho.length - 1
-    ? `<b>${esc(c.name)}</b>` : `<a href="#" onclick="abrirPasta('${c.id}'); return false">${esc(c.name)}</a>`).join(" › ");
+    ? `<b>${esc(c.name)}</b>` : `<a href="#" data-pasta="${c.id}" onclick="abrirPasta('${c.id}'); return false">${esc(c.name)}</a>`).join(" › ");
   const pastas = d.itens.filter(i => i.pasta), arquivos = d.itens.filter(i => !i.pasta);
   const fotos = arquivos.filter(i => i.imagem).length, videos = arquivos.filter(i => i.video).length;
   $("driveInfo").textContent = [pastas.length && `${pastas.length} pasta${pastas.length > 1 ? "s" : ""}`,
@@ -1340,11 +1340,11 @@ function desenharPasta() {
   if (($("buscaDrive").value || "").trim())
     $("driveInfo").textContent = `${visiveis.length} de ${d.itens.length} itens com "${$("buscaDrive").value.trim()}"`;
   $("driveGrade").innerHTML = visiveis.map(n => [d.itens[n], n]).map(([i, n]) => i.pasta
-    ? `<div class="item-drive pasta${selDrive.has(i.id) ? " sel" : ""}" data-n="${n}" onmouseenter="preverPasta('${i.id}')"
+    ? `<div class="item-drive pasta${selDrive.has(i.id) ? " sel" : ""}" data-n="${n}" draggable="true" onmouseenter="preverPasta('${i.id}')"
         title="${esc(i.nome)} — dois cliques para abrir">
         <i class="marca-sel">✓</i><div class="icone-pasta">📁</div>
         <div class="nome-pasta"><span>${esc(i.nome)}</span><small>${dataCurta(i.modificado)}</small></div></div>`
-    : `<div class="item-drive${selDrive.has(i.id) ? " sel" : ""}" data-n="${n}" title="${esc(i.nome)} — dois cliques para ver no Drive">
+    : `<div class="item-drive${selDrive.has(i.id) ? " sel" : ""}" data-n="${n}" draggable="true" title="${esc(i.nome)} — dois cliques para ver no Drive">
         <i class="marca-sel">✓</i>
         ${i.miniatura ? `<img loading="lazy" src="/api/pastas/miniatura/${i.id}?t=400">` : `<div class="icone-pasta">${i.video ? "🎬" : "📄"}</div>`}
         ${i.video ? `<i class="selo-video">▶ vídeo</i>` : ""}<span>${esc(i.nome)}</span></div>`).join("");
@@ -1355,7 +1355,8 @@ function mostrarSelecao() {
   document.querySelectorAll("#driveGrade .item-drive").forEach(el =>
     el.classList.toggle("sel", selDrive.has(dadosPasta.itens[+el.dataset.n].id)));
   const n = selDrive.size;
-  $("barraSelecao").style.display = n ? "" : "none";
+  // a barra ocupa sempre o mesmo espaço: aparecer não empurra as pastas (o duplo clique não erra)
+  $("barraSelecao").style.visibility = n ? "visible" : "hidden";
   if (!n) return;
   const itens = dadosPasta.itens.filter(i => selDrive.has(i.id));
   $("qtdSelecao").textContent = n === 1 ? itens[0].nome : `${n} itens selecionados`;
@@ -1671,3 +1672,119 @@ async function copiarLinkAlbum(id) {
   catch (e) { aviso("Não consegui copiar. Selecione o link e copie.", true); }
 }
 function whatsappAlbum(id) { abrirLink("https://wa.me/?text=" + encodeURIComponent(mensagemAlbum(id))); }
+
+
+// ------------------------------------------------------------- arrastar: mover e enviar
+let arrastando = null;   // ids sendo arrastados dentro do programa
+function alvoPasta(el) {
+  const card = el.closest && el.closest("#driveGrade .item-drive.pasta");
+  if (card) { const i = dadosPasta.itens[+card.dataset.n]; return {id: i.id, nome: i.nome, el: card}; }
+  const link = el.closest && el.closest("#trilha a[data-pasta]");
+  if (link) return {id: link.dataset.pasta, nome: link.textContent, el: link};
+  return null;
+}
+document.addEventListener("dragstart", e => {
+  const card = e.target.closest && e.target.closest("#driveGrade .item-drive");
+  if (!card) return;
+  const id = dadosPasta.itens[+card.dataset.n].id;
+  if (!selDrive.has(id)) { selDrive = new Set([id]); mostrarSelecao(); }
+  arrastando = [...selDrive];
+  e.dataTransfer.effectAllowed = "move";
+  e.dataTransfer.setData("text/plain", arrastando.join(","));
+});
+document.addEventListener("dragend", () => { arrastando = null; limparMarcas(); });
+function limparMarcas() {
+  document.querySelectorAll(".alvo-soltar").forEach(x => x.classList.remove("alvo-soltar"));
+  $("soltarAqui").classList.remove("visivel");
+}
+function temArquivos(e) { return [...(e.dataTransfer?.types || [])].includes("Files"); }
+document.addEventListener("dragover", e => {
+  if ($("telaDrive").style.display === "none" || !dadosPasta) return;
+  const alvo = alvoPasta(e.target);
+  const externo = temArquivos(e) && !arrastando;
+  if (!arrastando && !externo) return;
+  if (arrastando && (!alvo || arrastando.includes(alvo.id) || alvo.id === dadosPasta.pasta.id)) { limparMarcas(); return; }
+  if (externo && !e.target.closest(".drive-principal")) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = arrastando ? "move" : "copy";
+  limparMarcas();
+  if (alvo) alvo.el.classList.add("alvo-soltar");
+  if (externo) {
+    $("soltarNome").textContent = alvo ? alvo.nome : dadosPasta.pasta.name;
+    $("soltarAqui").classList.add("visivel");
+  }
+});
+document.addEventListener("dragleave", e => { if (!e.relatedTarget) limparMarcas(); });
+document.addEventListener("drop", async e => {
+  if ($("telaDrive").style.display === "none" || !dadosPasta) return;
+  const alvo = alvoPasta(e.target);
+  limparMarcas();
+  if (arrastando) {
+    e.preventDefault();
+    const ids = arrastando; arrastando = null;
+    if (alvo && !ids.includes(alvo.id)) await moverPara(ids, alvo.id, alvo.nome);
+    return;
+  }
+  if (temArquivos(e) && e.target.closest(".drive-principal")) {
+    e.preventDefault();
+    const destino = alvo || {id: dadosPasta.pasta.id, nome: dadosPasta.pasta.name};
+    enviarArrastados([...e.dataTransfer.files], destino);
+  }
+});
+async function moverPara(ids, destino, nome) {
+  try {
+    const r = await api("/api/pastas/mover", {ids, origem: dadosPasta.pasta.id, destino});
+    dadosPasta.itens = dadosPasta.itens.filter(i => !ids.includes(i.id));
+    delete cachePastas[chaveCache(destino)];
+    selDrive.clear(); desenharPasta();
+    aviso(`${r.quantos} ${r.quantos > 1 ? "itens movidos" : "item movido"} para "${nome}"`);
+  } catch (e) { aviso(e.message, true); }
+}
+function abrirMover() {
+  if (!selDrive.size) return;
+  const d = dadosPasta;
+  const opcoes = [];
+  if (d.caminho.length > 1) {
+    const pai = d.caminho[d.caminho.length - 2];
+    opcoes.push(`<button class="opcao-mover" onclick="fecharMover(); moverPara([...selDrive], '${pai.id}', '${esc(pai.name).replace(/'/g, "\\'")}')">⬆ ${esc(pai.name)} <small>(pasta de cima)</small></button>`);
+  }
+  d.itens.filter(i => i.pasta && !selDrive.has(i.id)).forEach(i => opcoes.push(
+    `<button class="opcao-mover" onclick="fecharMover(); moverPara([...selDrive], '${i.id}', '${esc(i.nome).replace(/'/g, "\\'")}')">📁 ${esc(i.nome)}</button>`));
+  $("listaMover").innerHTML = opcoes.join("") ||
+    '<p class="dica">Não há outra pasta aqui. Crie uma com "＋ Nova pasta" ou arraste para o caminho lá em cima.</p>';
+  $("janelaMover").style.display = "";
+}
+function fecharMover() { $("janelaMover").style.display = "none"; }
+
+// fotos e vídeos arrastados do computador: envia 3 por vez para a pasta
+async function enviarArrastados(arquivos, destino) {
+  const validos = arquivos.filter(f => /\.(jpe?g|png|heic|tiff?|mp4|mov|m4v|avi|mts|m2ts|mkv|wmv|3gp|mpe?g)$/i.test(f.name));
+  if (!validos.length) { aviso("Arraste fotos ou vídeos (pastas inteiras: use Enviar fotos e vídeos ao lado)", true); return; }
+  let feitos = 0, erros = 0;
+  const total = validos.length;
+  const barra = () => {
+    $("envioArrastado").style.display = "";
+    $("envioArrastadoMsg").textContent = `Enviando para "${destino.nome}": ${feitos} de ${total}` + (erros ? ` · ${erros} com erro` : "");
+    $("envioArrastadoBarra").style.width = (100 * feitos / total) + "%";
+  };
+  barra();
+  const fila = [...validos];
+  async function trabalhador() {
+    while (fila.length) {
+      const f = fila.shift();
+      const corpo = new FormData();
+      corpo.append("arquivo", f, f.name);
+      try {
+        const r = await fetch(`/api/pastas/${destino.id}/arquivo?empresa=${empresa}`, {method: "POST", body: corpo});
+        if (!r.ok) throw new Error((await r.json()).erro);
+      } catch (e) { erros++; }
+      feitos++; barra();
+    }
+  }
+  await Promise.all([trabalhador(), trabalhador(), trabalhador()]);
+  setTimeout(() => { $("envioArrastado").style.display = "none"; }, 2500);
+  aviso(erros ? `${total - erros} enviados, ${erros} com erro` : `${total} arquivos enviados para "${destino.nome}"`, !!erros);
+  delete cachePastas[chaveCache(destino.id)];
+  if (dadosPasta && (destino.id === dadosPasta.pasta.id || dadosPasta.itens.some(i => i.id === destino.id)))
+    abrirPasta(dadosPasta.pasta.id);
+}
