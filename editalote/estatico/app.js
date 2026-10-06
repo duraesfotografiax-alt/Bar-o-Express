@@ -1155,39 +1155,46 @@ async function carregarProjetos() {
   $("projetos").innerHTML = lista.map(p => {
     const enviando = envioAtual.estado === "enviando" && envioAtual.projeto === p.id;
     const feitas = enviando ? envioAtual.feitas : p.enviadas.length;
-    const pronto = p.link && feitas >= p.total;
+    const soDrive = !p.pasta;   // entrega de uma pasta que já estava no Drive
+    const pronto = p.link && (soDrive || feitas >= p.total);
     const selo = enviando ? `<span class="selo-estado enviando">Enviando ${feitas}/${p.total}</span>`
       : pronto ? `<span class="selo-estado pronto">Pronto para enviar ao cliente</span>`
       : `<span class="selo-estado">${feitas}/${p.total} fotos no Drive</span>`;
+    const sub = soDrive ? `${esc(p.criado)} · ${p.total} arquivos · pasta do Drive`
+      : `${esc(p.criado)} · ${p.total} fotos · ${p.tamanho === "leve" ? "versão leve" : "alta resolução"}`;
     return `<div class="projeto" data-id="${p.id}">
       <div class="topo-projeto"><div><h4>${esc(p.nome)}</h4>
-        <div class="sub">${esc(p.criado)} · ${p.total} fotos · ${p.tamanho === "leve" ? "versão leve" : "alta resolução"}</div></div>
+        <div class="sub">${sub}</div></div>
         ${selo}</div>
       ${enviando ? `<div class="barra"><div style="width:${100 * feitas / Math.max(1, p.total)}%"></div></div>` : ""}
       ${p.link ? `<div class="acoes">
         <input class="link" type="text" readonly value="${esc(p.link)}" onclick="this.select()">
-        <button onclick="copiarLink('${p.id}')">Copiar link</button>
+        <button onclick="copiarLink('${p.id}')" title="Copia a mensagem pronta com o link">💬 Copiar com mensagem</button>
+        <button onclick="copiarLink('${p.id}', true)" title="Copia só o endereço">🔗 Copiar só o link</button>
         <button onclick="whatsapp('${p.id}')">WhatsApp</button>
         <button class="fantasma" onclick="abrirLink('${esc(p.link)}')">Abrir no Drive</button></div>` : ""}
       <div class="acoes">
         <label class="chave"><input type="checkbox" ${p.permitir_download ? "checked" : ""}
           onchange="alterarDownload('${p.id}', this)"><i></i> Cliente pode baixar</label>
         <span style="margin-left:auto"></span>
-        ${!enviando && !pronto ? `<button class="contorno" onclick="enviarProjeto('${p.id}')">${p.link ? "Continuar envio" : "Enviar para o Drive"}</button>` : ""}
+        ${!enviando && !pronto && !soDrive ? `<button class="contorno" onclick="enviarProjeto('${p.id}')">${p.link ? "Continuar envio" : "Enviar para o Drive"}</button>` : ""}
         ${enviando ? `<button onclick="cancelarEnvio()">Pausar</button>` : ""}
         <button class="fantasma" onclick="excluirProjeto('${p.id}')">Excluir</button>
       </div></div>`;
   }).join("");
   window._projetos = Object.fromEntries(lista.map(p => [p.id, p]));
 }
-async function copiarLink(id) {
-  const p = window._projetos[id];
-  try { await navigator.clipboard.writeText(mensagemCliente(p)); }
+async function copiar(texto, msg) {
+  try { await navigator.clipboard.writeText(texto); }
   catch (e) {
-    const campo = document.querySelector(`.projeto[data-id="${id}"] input.link`);
-    campo.value = mensagemCliente(p); campo.select(); document.execCommand("copy"); campo.value = p.link;
+    const t = document.createElement("textarea"); t.value = texto; document.body.appendChild(t);
+    t.select(); document.execCommand("copy"); t.remove();
   }
-  aviso("Mensagem com o link copiada. É só colar para o cliente.");
+  aviso(msg);
+}
+function copiarLink(id, soLink) {
+  const p = window._projetos[id];
+  copiar(soLink ? p.link : mensagemCliente(p), soLink ? "Link copiado" : "Mensagem com o link copiada. É só colar para o cliente.");
 }
 function whatsapp(id) {
   abrirLink("https://wa.me/?text=" + encodeURIComponent(mensagemCliente(window._projetos[id])));
@@ -1480,10 +1487,7 @@ function mensagemPasta() {
   return `Olá! As fotos de ${d.pasta.name} estão prontas 📸\n` +
     `${$("ppDownload").checked ? "Você pode ver e baixar" : "Você pode ver"} todas aqui: ${d.link}\n\n${NOMES_EMPRESA[empresa]}`;
 }
-async function copiarLinkPasta() {
-  try { await navigator.clipboard.writeText(mensagemPasta()); aviso("Mensagem com o link copiada"); }
-  catch (e) { $("ppLink").select(); document.execCommand("copy"); aviso("Link copiado"); }
-}
+function copiarLinkPasta() { copiar(mensagemPasta(), "Mensagem com o link copiada"); }
 function whatsappPasta() { abrirLink("https://wa.me/?text=" + encodeURIComponent(mensagemPasta())); }
 async function downloadPasta(caixa) {
   try { const r = await api(`/api/pastas/${dadosPasta.pasta.id}/download`, {permitir: caixa.checked});
@@ -1610,7 +1614,8 @@ function cartaoAlbum(p, link) {
     </div>
     ${link ? `<div class="acoes">
       <input class="link" type="text" readonly value="${esc(link)}" onclick="this.select()">
-      <button onclick="copiarLinkAlbum('${p.id}')">Copiar link</button>
+      <button onclick="copiarLinkAlbum('${p.id}')">💬 Copiar com mensagem</button>
+      <button onclick="copiar(window._linksAlbum['${p.id}'], 'Link do álbum copiado')">🔗 Só o link</button>
       <button onclick="whatsappAlbum('${p.id}')">WhatsApp</button>
       <button class="fantasma" onclick="abrirLink(window._linksAlbum['${p.id}'])">Abrir</button></div>` : ""}
     ${s.fotos.length ? `<details class="acoes"><summary class="dica">Ver as ${s.fotos.length} fotos escolhidas${s.obs ? " · observação do cliente" : ""}</summary>
@@ -1787,4 +1792,41 @@ async function enviarArrastados(arquivos, destino) {
   delete cachePastas[chaveCache(destino.id)];
   if (dadosPasta && (destino.id === dadosPasta.pasta.id || dadosPasta.itens.some(i => i.id === destino.id)))
     abrirPasta(dadosPasta.pasta.id);
+}
+
+
+// ------------------------------------------------------------- Entregas: pasta que já está no Drive
+let escolha = null, pastaEscolhida = null;
+async function abrirEscolhaDrive(id) {
+  $("janelaEscolha").style.display = "";
+  $("listaEscolha").innerHTML = '<p class="dica">Carregando…</p>';
+  try { escolha = cachePastas[chaveCache(id || "")] || await buscarPasta(id || ""); }
+  catch (e) { $("listaEscolha").innerHTML = `<p class="erro">${esc(e.message)}</p>`; return; }
+  $("trilhaEscolha").innerHTML = escolha.caminho.map((c, i) => i === escolha.caminho.length - 1
+    ? `<b>${esc(c.name)}</b>` : `<a href="#" onclick="abrirEscolhaDrive('${c.id}'); return false">${esc(c.name)}</a>`).join(" › ");
+  const pastas = escolha.itens.filter(i => i.pasta).sort((a, b) => comparaNome.compare(a.nome, b.nome));
+  const arquivos = escolha.itens.length - pastas.length;
+  $("listaEscolha").innerHTML = (pastas.map(i =>
+    `<button class="opcao-mover" onclick="abrirEscolhaDrive('${i.id}')" onmouseenter="preverPasta('${i.id}')">📁 ${esc(i.nome)}</button>`).join("")
+    || '<p class="dica">Sem subpastas aqui.</p>') +
+    `<p class="dica">${arquivos} arquivo${arquivos === 1 ? "" : "s"} nesta pasta. Clique numa pasta para entrar; "Escolher esta pasta" usa a que está aberta.</p>`;
+}
+function usarPastaEscolhida() {
+  if (!escolha || escolha.meu_drive) { aviso("Abra a pasta do cliente antes de escolher", true); return; }
+  pastaEscolhida = escolha.pasta;
+  $("janelaEscolha").style.display = "none";
+  $("escolhidaDrive").style.display = "";
+  $("edNome").value = escolha.pasta.name;
+  const n = escolha.itens.filter(i => !i.pasta).length;
+  $("edInfo").textContent = `Pasta: ${escolha.caminho.map(c => c.name).join(" › ")} · ${n} arquivo${n === 1 ? "" : "s"}`;
+}
+async function entregarPastaDrive() {
+  if (!pastaEscolhida) return;
+  try {
+    const p = await api(`/api/pastas/${pastaEscolhida.id}/entregar`, {nome: $("edNome").value.trim() || pastaEscolhida.name,
+      permitir_download: $("edDownload").checked});
+    $("escolhidaDrive").style.display = "none"; pastaEscolhida = null;
+    await carregarProjetos();
+    aviso(`Entrega pronta: ${p.nome}. Copie o link na lista.`);
+  } catch (e) { aviso(e.message, true); }
 }

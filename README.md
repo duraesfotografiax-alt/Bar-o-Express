@@ -34,7 +34,11 @@ Programa de PC para **entregar fotos e vídeos aos clientes pelo Google Drive**,
    **Trocar a pasta principal:** no caminho em cima da lista, clique em **Meu Drive**, abra a pasta
    que quer usar (ex.: a pasta de entregas que vocês já têm) e clique em **Usar como pasta
    principal**. Faça isso com a Durães e com a Elite (cada uma tem a sua).
-3. **Aba Entregas**: os envios feitos (andamento, link, download).
+3. **Aba Entregas**: **📁 Escolher pasta do Drive** entrega uma pasta que já está no Drive (sem subir
+   nada: escolha a pasta, confira o nome, clique em **Gerar entrega e link**). Ou **Enviar do
+   computador**. Cada entrega tem **💬 Copiar com mensagem** (texto pronto para o cliente),
+   **🔗 Copiar só o link**, WhatsApp e a chave de download. Os mesmos dois botões existem na aba
+   Drive e no álbum.
 4. **Aba Álbum**: o cliente escolhe as fotos do álbum pelo celular; o programa separa as escolhidas.
 
 A edição de fotos em lote (versões anteriores) continua no código, mas saiu da tela: a edição é

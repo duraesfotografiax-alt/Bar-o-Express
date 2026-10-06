@@ -242,7 +242,7 @@ class Drive:
         itens, pagina = [], None
         while True:
             q = urllib.parse.quote(f"'{pasta_id}' in parents and trashed=false")
-            url = f"{API}/files?q={q}&fields=nextPageToken,files(id,name)&pageSize=1000"
+            url = f"{API}/files?q={q}&fields=nextPageToken,files(id,name,mimeType)&pageSize=1000"
             if pagina:
                 url += f"&pageToken={pagina}"
             resp = self._json("GET", url)

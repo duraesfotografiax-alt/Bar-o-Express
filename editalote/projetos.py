@@ -20,7 +20,7 @@ from datetime import datetime
 
 from PIL import Image
 
-from .drive import Drive, ErroDrive, ler_cliente, salvar_json
+from .drive import PASTA_MIME, Drive, ErroDrive, ler_cliente, salvar_json
 from .metadados import EXTENSOES, EXTENSOES_VIDEO
 
 log = logging.getLogger("editalote.projetos")
@@ -183,7 +183,8 @@ class Projetos:
         if projeto.get("drive_pasta"):
             # a opção vale para cada FOTO; o Google recusa (erro 400) essa opção em pastas
             drive = self.drive()
-            itens = drive.listar(projeto["drive_pasta"])
+            # só arquivos: o Google recusa essa opção em pastas (erro 400)
+            itens = [i for i in drive.listar(projeto["drive_pasta"]) if i.get("mimeType") != PASTA_MIME]
             with ThreadPoolExecutor(max_workers=4) as ex:
                 list(ex.map(lambda item: drive.permitir_download(item["id"], permitir), itens))
         return projeto
@@ -308,6 +309,15 @@ class Projetos:
     def vincular(self, drive_pasta: str, nome: str, empresa: str) -> dict:
         """Projeto para uma pasta que já existe no Drive (aba Drive): para enviar arquivos ou o álbum."""
         return self.projeto_da_pasta(drive_pasta) or self.criar(nome, "", empresa=empresa, drive_pasta=drive_pasta)
+
+    def entregar_pasta(self, drive_pasta: str, nome: str, empresa: str, permitir: bool = False) -> dict:
+        """Entrega de uma pasta que JÁ está no Drive (sem subir nada): gera o link e conta os arquivos."""
+        drive = self.drive()
+        projeto = self.vincular(drive_pasta, nome, empresa)
+        itens = [i for i in drive.listar(drive_pasta) if i.get("mimeType") != PASTA_MIME]
+        link = projeto.get("link") or drive.compartilhar_com_link(drive_pasta)
+        return self._atualizar(projeto["id"], nome=nome or projeto["nome"], link=link,
+                               total=len(itens), no_drive=len(itens))
 
     def enviar_para_pasta(self, drive_pasta: str, nome: str, empresa: str, pasta_local: str,
                           tamanho: str = "original", permitir: bool = False) -> "Envio":

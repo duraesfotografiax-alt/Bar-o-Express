@@ -650,6 +650,20 @@ def pastas_enviar(pasta_id):
         return _erro(erro)
 
 
+@app.post("/api/pastas/<pasta_id>/entregar")
+def pastas_entregar(pasta_id):
+    """Aba Entregas: entregar uma pasta que já está no Drive (gera link, sem subir nada)."""
+    dados = request.json or {}
+    try:
+        projeto = projetos.entregar_pasta(pasta_id, (dados.get("nome") or "").strip(), _empresa(),
+                                          bool(dados.get("permitir_download")))
+        if dados.get("permitir_download"):
+            projeto = projetos.alterar_download(projeto["id"], True)
+        return jsonify(projeto)
+    except (ValueError, ErroDrive) as erro:
+        return _erro(erro)
+
+
 @app.post("/api/pastas/<pasta_id>/principal")
 def pastas_principal(pasta_id):
     projetos.definir_raiz(_empresa(), pasta_id)

@@ -412,3 +412,23 @@ def test_mover_e_receber_arquivo_arrastado(ambiente, monkeypatch):
     dentro = [i["nome"] for i in c.get(f"/api/pastas?empresa=duraes&id={destino}").get_json()["itens"]]
     assert sorted(dentro) == ["A.jpg", "B.mp4"]
     assert c.post("/api/pastas/mover", json={"ids": [destino], "origem": raiz, "destino": destino}).status_code == 400
+
+
+def test_entregar_pasta_que_ja_esta_no_drive(ambiente, monkeypatch):
+    from editalote import servidor
+
+    pj, falso, fotos = ambiente
+    monkeypatch.setattr(servidor, "projetos", pj)
+    c = servidor.app.test_client()
+    raiz = c.get("/api/pastas?empresa=elite").get_json()["raiz"]
+    drive = pj.drive()
+    pasta = drive.criar_pasta("Loja Bella - Outubro", raiz)
+    for n in ("1.jpg", "2.jpg", "3.mp4"):
+        drive.enviar_foto(n, b"x", pasta, False)
+    drive.criar_pasta("Sub", pasta)
+    p = c.post(f"/api/pastas/{pasta}/entregar", json={"empresa": "elite", "nome": "Loja Bella - Outubro",
+                                                      "permitir_download": True}).get_json()
+    assert p["link"] and p["total"] == 3 and p["pasta"] == "" and p["empresa"] == "elite"
+    assert p["permitir_download"] is True
+    assert all(not a["copyRequiresWriterPermission"] for a in falso.fotos_em(pasta) if a.get("name") != "Sub")
+    assert [x["nome"] for x in c.get("/api/projetos?empresa=elite").get_json()] == ["Loja Bella - Outubro"]

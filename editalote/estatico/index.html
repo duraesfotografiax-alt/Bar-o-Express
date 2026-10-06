@@ -82,7 +82,8 @@
       <div id="ppComLink" style="display:none">
         <input class="link" type="text" readonly id="ppLink" onclick="this.select()">
         <div class="linha" style="margin-top:6px; flex-wrap:wrap; gap:6px">
-          <button onclick="copiarLinkPasta()">Copiar</button>
+          <button onclick="copiarLinkPasta()">💬 Copiar com mensagem</button>
+          <button onclick="copiar(dadosPasta.link, 'Link copiado')">🔗 Só o link</button>
           <button onclick="whatsappPasta()">WhatsApp</button>
           <button class="fantasma" onclick="tirarLinkPasta()" title="Ninguém mais abre com o link">Desativar link</button>
         </div>
@@ -106,7 +107,8 @@
       <div class="linha"><input type="number" min="0" id="ppLimite" placeholder="Fotos no álbum (vazio = sem limite)">
         <button class="contorno" onclick="albumPasta()">Liberar seleção</button></div>
       <div id="ppAlbum" style="display:none" class="linha">
-        <button onclick="copiarAlbumPasta()">Copiar link do álbum</button>
+        <button onclick="copiarAlbumPasta()">💬 Álbum com mensagem</button>
+        <button onclick="copiar(dadosPasta.link_album, 'Link do álbum copiado')">🔗 Só o link</button>
         <button onclick="whatsappAlbumPasta()">WhatsApp</button>
       </div>
       </div>
@@ -431,7 +433,20 @@
     <!-- conexão com o Google: aba Drive -->
 
     <section class="bloco-fixo">
-      <h3 class="titulo-cartao">Novo projeto</h3>
+      <h3 class="titulo-cartao">Entregar pasta do Drive</h3>
+      <p class="dica">Para fotos e vídeos que já estão no Drive: escolha a pasta e o link sai na hora.</p>
+      <button class="contorno" style="width:100%" onclick="abrirEscolhaDrive()">📁 Escolher pasta do Drive</button>
+      <div id="escolhidaDrive" style="display:none">
+        <label>Nome do cliente / evento</label>
+        <input type="text" id="edNome">
+        <p class="dica" id="edInfo"></p>
+        <label class="check"><input type="checkbox" id="edDownload"> Cliente pode baixar as fotos</label>
+        <button class="destaque" style="width:100%; margin-top:6px" onclick="entregarPastaDrive()">Gerar entrega e link</button>
+      </div>
+    </section>
+
+    <section class="bloco-fixo">
+      <h3 class="titulo-cartao">Enviar do computador</h3>
       <label>Cliente / evento</label>
       <input type="text" id="pjNome" placeholder="Casamento Ana e João">
       <label>Pasta com as fotos para entregar</label>
@@ -470,6 +485,17 @@
   </div>
   <div class="barra"><div id="progBarra"></div></div>
   <div id="progDetalhe" class="dica"></div>
+</div>
+<div class="janela-mover" id="janelaEscolha" style="display:none">
+  <div class="caixa-mover">
+    <h3 class="titulo-cartao">Escolher pasta do Drive</h3>
+    <nav class="trilha" id="trilhaEscolha"></nav>
+    <div id="listaEscolha" style="margin-top:8px"></div>
+    <div class="linha" style="justify-content:flex-end; margin-top:12px; gap:8px">
+      <button class="fantasma" onclick="$('janelaEscolha').style.display='none'">Cancelar</button>
+      <button class="destaque" onclick="usarPastaEscolhida()">Escolher esta pasta</button>
+    </div>
+  </div>
 </div>
 <div class="aviso" id="aviso"></div>
 
