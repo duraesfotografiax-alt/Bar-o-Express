@@ -26,6 +26,8 @@ from .metadados import EXTENSOES, EXTENSOES_VIDEO
 log = logging.getLogger("editalote.projetos")
 
 PASTA_RAIZ_DRIVE = "Durães APP · Clientes"
+EMPRESAS = {"duraes": "Durães Fotografia", "elite": "Elite Marketing Digital"}
+EMPRESAS = {"duraes": "Durães Fotografia", "elite": "Elite Marketing Digital"}
 LADO_LEVE = 3000
 PASTA_ALBUM = "Álbum (seleção do cliente)"
 ARQUIVO_SELECAO = "selecao_album.json"
@@ -110,7 +112,11 @@ class Projetos:
             configurado = False
         conectado = configurado and os.path.isfile(self.arquivo_token)
         dados = self._dados()
-        return {"configurado": configurado, "conectado": conectado, "conta": dados.get("conta", "")}
+        token = _ler(self.arquivo_token, {}) if conectado else {}
+        # login antigo (só as pastas criadas pelo programa): pede para entrar de novo
+        acesso_total = conectado and "auth/drive.file" not in str(token.get("escopo", "auth/drive.file"))
+        return {"configurado": configurado, "conectado": conectado, "conta": dados.get("conta", ""),
+                "acesso_total": acesso_total}
 
     # ---------------------------------------------------------------- dados
     def _dados(self) -> dict:
@@ -145,19 +151,26 @@ class Projetos:
             dados["conta"] = conta
             self._gravar(dados)
 
-    def criar(self, nome: str, pasta: str, tamanho: str = "original", permitir: bool = False) -> dict:
+    def listar_empresa(self, empresa: str) -> list[dict]:
+        return [p for p in self.listar() if p.get("empresa", "duraes") == empresa]
+
+    def criar(self, nome: str, pasta: str, tamanho: str = "original", permitir: bool = False,
+              empresa: str = "duraes", drive_pasta: str = "", pai: str = "") -> dict:
         nome = nome.strip()
         if not nome:
             raise ValueError("Dê um nome ao projeto (ex.: Casamento Ana e João)")
-        if not os.path.isdir(pasta):
-            raise ValueError("Pasta das fotos não encontrada")
-        if not fotos_da_pasta(pasta):
-            raise ValueError("Não há fotos JPEG nem vídeos nessa pasta")
+        if pasta or not drive_pasta:
+            if not os.path.isdir(pasta):
+                raise ValueError("Pasta das fotos não encontrada")
+            if not fotos_da_pasta(pasta):
+                raise ValueError("Não há fotos nem vídeos nessa pasta")
         projeto = {
             "id": secrets.token_hex(4), "nome": nome, "pasta": pasta,
+            "empresa": empresa if empresa in EMPRESAS else "duraes", "pai": pai,
             "tamanho": "leve" if tamanho == "leve" else "original",
             "permitir_download": bool(permitir), "criado": datetime.now().strftime("%d/%m/%Y %H:%M"),
-            "drive_pasta": "", "link": "", "enviadas": [], "total": len(fotos_da_pasta(pasta)),
+            "drive_pasta": drive_pasta, "link": "", "enviadas": [],
+            "total": len(fotos_da_pasta(pasta)) if pasta else 0,
         }
         with self._trava:
             dados = self._dados()
@@ -243,9 +256,15 @@ class Projetos:
         self._atualizar(pid, album_selecao=selecao)
         return selecao
 
-    def separar_album(self, pid: str, nomes: list[str] | None = None) -> dict:
+    def separar_album(self, pid: str, nomes: list[str] | None = None, pasta_local: str = "") -> dict:
         """Copia as fotos escolhidas (pelo nome) para a pasta "Álbum (seleção do cliente)"."""
+        if pasta_local:
+            if not os.path.isdir(pasta_local):
+                raise ValueError("Pasta das fotos não encontrada")
+            self._atualizar(pid, pasta=pasta_local)
         projeto = self.obter(pid)
+        if not projeto.get("pasta"):
+            raise ValueError("Escolha a pasta do computador onde estão as fotos deste cliente")
         if nomes is None:
             nomes = (projeto.get("album_selecao") or {}).get("fotos", [])
         nomes = [os.path.basename(n.strip()) for n in nomes if n and n.strip()]
@@ -264,18 +283,43 @@ class Projetos:
         return {"pasta": destino, "copiadas": copiadas, "faltando": faltando}
 
     # ---------------------------------------------------------------- envio
-    def _pasta_raiz(self, drive: Drive) -> str:
-        with self._trava:
-            dados = self._dados()
-            raiz = dados.get("drive_raiz")
+    def _pasta_raiz(self, drive: Drive, empresa: str = "duraes") -> str:
+        """Pasta principal da empresa no Drive (escolhida na aba Drive, ou criada com o nome dela)."""
+        raiz = self.raiz_empresa(empresa)
         if raiz and drive.existe(raiz):
             return raiz
-        raiz = drive.criar_pasta(PASTA_RAIZ_DRIVE)
+        raiz = drive.criar_pasta(EMPRESAS.get(empresa, EMPRESAS["duraes"]))
+        self.definir_raiz(empresa, raiz)
+        return raiz
+
+    def raiz_empresa(self, empresa: str) -> str:
+        dados = self._dados()
+        return (dados.get("raizes") or {}).get(empresa) or (dados.get("drive_raiz") if empresa == "duraes" else "") or ""
+
+    def definir_raiz(self, empresa: str, pasta_id: str):
         with self._trava:
             dados = self._dados()
-            dados["drive_raiz"] = raiz
+            dados.setdefault("raizes", {})[empresa] = pasta_id
             self._gravar(dados)
-        return raiz
+
+    def projeto_da_pasta(self, drive_pasta: str) -> dict | None:
+        return next((p for p in self.listar() if p.get("drive_pasta") == drive_pasta), None)
+
+    def vincular(self, drive_pasta: str, nome: str, empresa: str) -> dict:
+        """Projeto para uma pasta que já existe no Drive (aba Drive): para enviar arquivos ou o álbum."""
+        return self.projeto_da_pasta(drive_pasta) or self.criar(nome, "", empresa=empresa, drive_pasta=drive_pasta)
+
+    def enviar_para_pasta(self, drive_pasta: str, nome: str, empresa: str, pasta_local: str,
+                          tamanho: str = "original", permitir: bool = False) -> "Envio":
+        if not os.path.isdir(pasta_local) or not fotos_da_pasta(pasta_local):
+            raise ValueError("Escolha uma pasta do computador com fotos ou vídeos")
+        projeto = self.vincular(drive_pasta, nome, empresa)
+        mesma = bool(projeto.get("pasta")) and os.path.normcase(os.path.abspath(projeto["pasta"])) == \
+            os.path.normcase(os.path.abspath(pasta_local))
+        self._atualizar(projeto["id"], pasta=pasta_local, total=len(fotos_da_pasta(pasta_local)),
+                        tamanho="leve" if tamanho == "leve" else "original", permitir_download=bool(permitir),
+                        enviadas=projeto.get("enviadas", []) if mesma else [])
+        return self.enviar(projeto["id"])
 
     def enviar(self, pid: str, processos: int = 3) -> "Envio":
         with self._trava:
@@ -323,12 +367,18 @@ class Envio:
         projeto = pj.obter(self.pid)
         if not projeto.get("drive_pasta") or not drive.existe(projeto["drive_pasta"]):
             self.mensagem = "Criando a pasta do cliente no Drive…"
-            pasta = drive.criar_pasta(projeto["nome"], pj._pasta_raiz(drive))
+            pai = projeto.get("pai") or pj._pasta_raiz(drive, projeto.get("empresa", "duraes"))
+            pasta = drive.criar_pasta(projeto["nome"], pai)
             link = drive.compartilhar_com_link(pasta)
             projeto = pj._atualizar(self.pid, drive_pasta=pasta, link=link, enviadas=[])
+        elif not projeto.get("link"):   # pasta que já existia no Drive: o link sai ao enviar
+            projeto = pj._atualizar(self.pid, link=drive.compartilhar_com_link(projeto["drive_pasta"]))
         fotos = fotos_da_pasta(projeto["pasta"])
         ja = set(projeto.get("enviadas", []))
-        faltam = [f for f in fotos if os.path.relpath(f, projeto["pasta"]) not in ja]
+        # o que já está na pasta do Drive (com o mesmo nome) não sobe de novo
+        no_drive = {i["name"] for i in drive.listar(projeto["drive_pasta"])}
+        faltam = [f for f in fotos if os.path.relpath(f, projeto["pasta"]) not in ja
+                  and os.path.basename(f) not in no_drive]
         self.total = len(fotos)
         self.feitas = self.total - len(faltam)
         pj._atualizar(self.pid, total=self.total)

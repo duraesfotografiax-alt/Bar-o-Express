@@ -23,7 +23,9 @@ import urllib.request
 
 log = logging.getLogger("editalote.drive")
 
-ESCOPO = "https://www.googleapis.com/auth/drive.file"
+# Acesso completo ao Drive: o programa mostra TODAS as pastas (as antigas e as criadas por outros
+# programas), não só as que ele mesmo criou.
+ESCOPO = "https://www.googleapis.com/auth/drive"
 URL_AUTORIZAR = "https://accounts.google.com/o/oauth2/v2/auth"
 URL_TOKEN = "https://oauth2.googleapis.com/token"
 API = "https://www.googleapis.com/drive/v3"
@@ -95,7 +97,8 @@ class Login:
         if status != 200 or "refresh_token" not in resposta:
             raise ErroDrive(f"O Google recusou o login: {resposta.get('error_description') or resposta.get('error') or status}")
         return {"refresh_token": resposta["refresh_token"], "access_token": resposta["access_token"],
-                "expira": time.time() + int(resposta.get("expires_in", 3600)) - 60}
+                "expira": time.time() + int(resposta.get("expires_in", 3600)) - 60,
+                "escopo": resposta.get("scope", ESCOPO)}
 
 
 # ---------------------------------------------------------------- operações
@@ -193,6 +196,64 @@ class Drive:
             pagina = resp.get("nextPageToken")
             if not pagina:
                 return itens
+
+    # -- navegação (aba Drive)
+    CAMPOS_ITEM = "id,name,mimeType,size,thumbnailLink,modifiedTime,iconLink,webViewLink,shortcutDetails"
+
+    def itens(self, pasta_id: str) -> list[dict]:
+        """Pastas e arquivos dentro de uma pasta (pastas primeiro, depois por nome)."""
+        itens, pagina = [], None
+        while True:
+            q = urllib.parse.quote(f"'{pasta_id}' in parents and trashed=false")
+            url = (f"{API}/files?q={q}&fields=nextPageToken,files({self.CAMPOS_ITEM})"
+                   f"&pageSize=1000&orderBy=folder,name_natural&supportsAllDrives=true")
+            if pagina:
+                url += f"&pageToken={pagina}"
+            resp = self._json("GET", url)
+            itens += resp.get("files", [])
+            pagina = resp.get("nextPageToken")
+            if not pagina:
+                return itens
+
+    def info(self, arquivo_id: str) -> dict:
+        return self._json("GET", f"{API}/files/{arquivo_id}?fields=id,name,mimeType,parents,webViewLink,"
+                                 "ownedByMe&supportsAllDrives=true")
+
+    def caminho(self, pasta_id: str, ate: str | None = None, limite: int = 12) -> list[dict]:
+        """[{id, name}, ...] da pasta de cima até esta (para o "você está em")."""
+        partes = []
+        atual = pasta_id
+        for _ in range(limite):
+            dados = self.info(atual)
+            partes.insert(0, {"id": dados["id"], "name": dados.get("name", "")})
+            pais = dados.get("parents") or []
+            if atual == ate or not pais:
+                break
+            atual = pais[0]
+        return partes
+
+    def link_publico(self, arquivo_id: str) -> str | None:
+        """Link "qualquer pessoa com o link" se já estiver compartilhada, senão None."""
+        resp = self._json("GET", f"{API}/files/{arquivo_id}/permissions?fields=permissions(id,type,role)"
+                                 "&supportsAllDrives=true")
+        if any(p.get("type") == "anyone" for p in resp.get("permissions", [])):
+            return f"https://drive.google.com/drive/folders/{arquivo_id}?usp=sharing"
+        return None
+
+    def tirar_link(self, arquivo_id: str):
+        resp = self._json("GET", f"{API}/files/{arquivo_id}/permissions?fields=permissions(id,type)")
+        for p in resp.get("permissions", []):
+            if p.get("type") == "anyone":
+                self._json("DELETE", f"{API}/files/{arquivo_id}/permissions/{p['id']}")
+
+    def renomear(self, arquivo_id: str, nome: str):
+        self._json("PATCH", f"{API}/files/{arquivo_id}", {"name": nome})
+
+    def baixar_miniatura(self, url: str) -> tuple[bytes, str]:
+        status, cab, dados = self._chamar("GET", url)
+        if status != 200:
+            raise ErroDrive(f"miniatura indisponível ({status})")
+        return dados, cab.get("Content-Type") or cab.get("content-type") or "image/jpeg"
 
     def permitir_download(self, arquivo_id: str, permitir: bool):
         """Com download bloqueado, quem tem o link só vê: o Drive esconde baixar/imprimir/copiar."""

@@ -1,11 +1,32 @@
-# Durães APP · Durães Fotografia
+# Durães APP · Durães Fotografia & Elite Marketing Digital
 
-Programa de PC para edição de fotos **em lote** em casamentos, aniversários e eventos. Ele edita
-1.500, 2.000 ou 3.000 JPEGs com o **estilo do estúdio** em poucos minutos, **sem perder qualidade**
-e sem subir nada para a internet. Tudo roda no seu computador. A **IA de estilo** aprende como vocês
-editam cada tipo de foto no Lightroom e repete isso foto a foto.
+Programa de PC para **entregar fotos e vídeos aos clientes pelo Google Drive**, sem abrir o Google:
 
-## O que ele faz
+1. **Entrada**: escolha **Durães Fotografia** ou **Elite Marketing Digital** (mesma conta Google;
+   cada empresa tem sua pasta principal no Drive, seus clientes, seus álbuns e seu visual).
+   O logo no topo (ou **⇄ Trocar empresa**) volta para essa escolha.
+2. **Aba Drive**: navega pelas pastas do Drive dentro do programa (miniaturas das fotos e vídeos).
+   **＋ Nova pasta** cria a pasta do cliente. Na pasta aberta:
+   - **Gerar link** (qualquer pessoa com o link vê), **Copiar** e **WhatsApp** com a mensagem pronta,
+     **Desativar link**;
+   - **Cliente pode baixar**: liga/desliga o download (desligado = só visualizar);
+   - **Enviar fotos e vídeos**: escolha a pasta exportada do Lightroom; o programa sobe tudo (vídeos
+     grandes em partes, continua de onde parou) e o link sai pronto. O que já está na pasta do
+     Drive com o mesmo nome não sobe de novo;
+   - **Álbum**: libera a seleção de fotos para o cliente (veja "Seleção do álbum");
+   - Abrir no Google Drive, renomear, usar como pasta principal da empresa, mover para a lixeira.
+3. **Aba Entregas**: os envios feitos (andamento, link, download).
+4. **Aba Álbum**: o cliente escolhe as fotos do álbum pelo celular; o programa separa as escolhidas.
+
+A edição de fotos em lote (versões anteriores) continua no código, mas saiu da tela: a edição é
+feita no Lightroom.
+
+> Na primeira vez depois de atualizar para esta versão, clique em **Entrar de novo** (aba Drive):
+> o programa passa a pedir acesso a **todas** as pastas do Drive (antes só via as que ele mesmo
+> criava). O Google mostra um aviso mais forte; é o app de vocês, pode continuar.
+
+## Edição em lote (versões anteriores)
+
 
 1. **Lê a pasta do evento** (inclusive subpastas de cada fotógrafo).
 2. **Reconhece cada câmera** pelo EXIF (Canon SL3/250D, T7, T6, T5i, Sony ZV-E10…), inclusive duas

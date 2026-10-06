@@ -9,25 +9,130 @@
 </head>
 <body>
 
+<!-- ====================================================== entrada: escolher a empresa -->
+<div class="entrada" id="telaEmpresa">
+  <div class="entrada-conteudo">
+    <h1>Escolha a empresa</h1>
+    <div class="cartoes-empresa">
+      <button class="cartao-empresa duraes" onclick="escolherEmpresa('duraes')">
+        <img src="/estatico/marca/logo.png" alt="">
+        <span>Durães Fotografia</span>
+      </button>
+      <button class="cartao-empresa elite" onclick="escolherEmpresa('elite')">
+        <img src="/estatico/marca/elite_logo.jpg" alt="">
+        <span>Elite Marketing Digital</span>
+      </button>
+    </div>
+    <p class="dica">As duas usam a mesma conta Google. Cada uma tem a sua pasta principal no Drive,
+      os seus clientes e os seus álbuns.</p>
+  </div>
+</div>
+
 <header class="topo">
-  <div class="marca">
-    <img src="/estatico/marca/simbolo.png" alt="Durães Fotografia">
-    <div class="nome">Durães APP<small>EDIÇÃO EM LOTE COM IA</small></div>
+  <div class="marca" onclick="mostrarEntrada()" title="Trocar de empresa" style="cursor:pointer">
+    <img id="marcaImg" src="/estatico/marca/simbolo.png" alt="">
+    <div class="nome"><span id="marcaNome">Durães Fotografia</span><small>ENTREGAS · DRIVE · ÁLBUM</small></div>
   </div>
   <nav class="modos">
-    <button class="ativo" data-modo="edicao" onclick="trocarModo('edicao')">Edição</button>
-    <button data-modo="clientes" onclick="trocarModo('clientes')">Clientes</button>
+    <button class="ativo" data-modo="drive" onclick="trocarModo('drive')">Drive</button>
+    <button data-modo="clientes" onclick="trocarModo('clientes')">Entregas</button>
     <button data-modo="album" onclick="trocarModo('album')">Álbum</button>
+    <button data-modo="edicao" onclick="trocarModo('edicao')" style="display:none">Edição</button>
   </nav>
-  <nav class="passos" id="passos">
+  <button class="fantasma trocar-empresa" onclick="mostrarEntrada()">⇄ Trocar empresa</button>
+  <nav class="passos" id="passos" style="display:none">
     <div class="passo atual" data-passo="1"><b>1</b>Fotos</div>
     <div class="passo" data-passo="2"><b>2</b>Estilo</div>
     <div class="passo" data-passo="3"><b>3</b>Entregar</div>
   </nav>
-  <button class="btn-principal" id="btnProcessar" onclick="processar()">Editar todas as fotos</button>
+  <button class="btn-principal" id="btnProcessar" onclick="processar()" style="display:none">Editar todas as fotos</button>
 </header>
 
-<div class="app" id="telaEdicao">
+<!-- ====================================================== aba Drive -->
+<div class="clientes" id="telaDrive">
+  <aside class="lateral esq">
+    <section class="bloco-fixo" id="cartaoDrive">
+      <h3 class="titulo-cartao">Google Drive</h3>
+      <div id="driveNaoConfigurado">
+        <p class="dica">Configuração única. Escolha o arquivo <b>.json</b> do Google (ID do cliente OAuth,
+          tipo App para computador). Veja o LEIA-ME, parte "Entrega para clientes".</p>
+        <button class="destaque" style="width:100%" onclick="configurarDrive()">Escolher arquivo do Google (.json)</button>
+      </div>
+      <div id="driveDesconectado" style="display:none">
+        <p class="dica">Tudo configurado. Agora entre com a conta Google das entregas.
+          O navegador vai abrir; depois de permitir, volte para cá.</p>
+        <button class="destaque" style="width:100%" onclick="entrarDrive()">Entrar com Google</button>
+      </div>
+      <div id="driveConectado" style="display:none">
+        <p class="dica"><span class="ok">● Conectado</span> <span id="driveConta"></span></p>
+        <p class="dica erro" id="driveAcessoParcial" style="display:none">Para ver <b>todas</b> as pastas do
+          Drive, entre de novo (o Google vai pedir a permissão nova).
+          <button class="contorno" onclick="entrarDrive()">Entrar de novo</button></p>
+        <button class="fantasma" onclick="sairDrive()">Sair da conta</button>
+      </div>
+      <p class="dica" id="driveMsg"></p>
+    </section>
+
+    <section class="bloco-fixo" id="painelPasta" style="display:none">
+      <h3 class="titulo-cartao" id="ppNome">Pasta</h3>
+      <p class="dica" id="ppResumo"></p>
+      <div id="ppCliente">
+      <h4>Link para o cliente</h4>
+      <div id="ppSemLink"><button class="destaque" style="width:100%" onclick="gerarLinkPasta()">Gerar link</button></div>
+      <div id="ppComLink" style="display:none">
+        <input class="link" type="text" readonly id="ppLink" onclick="this.select()">
+        <div class="linha" style="margin-top:6px; flex-wrap:wrap; gap:6px">
+          <button onclick="copiarLinkPasta()">Copiar</button>
+          <button onclick="whatsappPasta()">WhatsApp</button>
+          <button class="fantasma" onclick="tirarLinkPasta()" title="Ninguém mais abre com o link">Desativar link</button>
+        </div>
+      </div>
+      <label class="chave" style="margin-top:10px"><input type="checkbox" id="ppDownload" onchange="downloadPasta(this)"><i></i>
+        Cliente pode baixar</label>
+
+      <h4>Enviar fotos e vídeos para esta pasta</h4>
+      <div class="linha"><input type="text" id="ppLocal" placeholder="Pasta exportada do Lightroom">
+        <button onclick="escolherLocalPasta()">Procurar</button></div>
+      <select id="ppTamanho">
+        <option value="original">Original (alta resolução)</option>
+        <option value="leve">Leve (fotos com 3000 px)</option>
+      </select>
+      <button class="destaque" style="width:100%; margin-top:6px" onclick="enviarParaPasta()">Enviar</button>
+      <div id="ppEnvio" style="display:none"><div class="barra"><div id="ppBarra"></div></div>
+        <p class="dica" id="ppEnvioMsg"></p>
+        <button class="fantasma" onclick="cancelarEnvio()">Pausar</button></div>
+
+      <h4>Álbum</h4>
+      <div class="linha"><input type="number" min="0" id="ppLimite" placeholder="Fotos no álbum (vazio = sem limite)">
+        <button class="contorno" onclick="albumPasta()">Liberar seleção</button></div>
+      <div id="ppAlbum" style="display:none" class="linha">
+        <button onclick="copiarAlbumPasta()">Copiar link do álbum</button>
+        <button onclick="whatsappAlbumPasta()">WhatsApp</button>
+      </div>
+      </div>
+
+      <h4>Pasta</h4>
+      <div class="linha" style="flex-wrap:wrap; gap:6px">
+        <button class="fantasma" onclick="abrirLink(dadosPasta.pasta_link)">Abrir no Google Drive</button>
+        <button class="fantasma" onclick="renomearPasta()">Renomear</button>
+        <button class="fantasma" onclick="definirPrincipal()" id="ppPrincipal">Usar como pasta principal</button>
+        <button class="fantasma perigo" onclick="lixeiraPasta()">Mover para a lixeira</button>
+      </div>
+    </section>
+  </aside>
+  <main class="lista-projetos drive-principal">
+    <div class="drive-barra">
+      <nav class="trilha" id="trilha"></nav>
+      <span style="margin-left:auto"></span>
+      <button onclick="novaPasta()">＋ Nova pasta</button>
+      <button class="fantasma" onclick="abrirPasta(dadosPasta && dadosPasta.pasta.id)" title="Atualizar">↻</button>
+    </div>
+    <p class="dica" id="driveInfo"></p>
+    <div class="drive-grade" id="driveGrade"></div>
+  </main>
+</div>
+
+<div class="app" id="telaEdicao" style="display:none">
   <!-- ====================================================== esquerda: fotos -->
   <aside class="lateral esq">
     <details class="bloco" open>
@@ -297,24 +402,7 @@
 
 <div class="clientes" id="telaClientes" style="display:none">
   <aside class="lateral esq">
-    <section class="bloco-fixo" id="cartaoDrive">
-      <h3 class="titulo-cartao">Google Drive</h3>
-      <div id="driveNaoConfigurado">
-        <p class="dica">Configuração única (uns 10 minutos). Siga o passo a passo do LEIA-ME, na
-          parte "Entrega para clientes", e escolha aqui o arquivo <b>.json</b> baixado do Google.</p>
-        <button class="destaque" style="width:100%" onclick="configurarDrive()">Escolher arquivo do Google (.json)</button>
-      </div>
-      <div id="driveDesconectado" style="display:none">
-        <p class="dica">Tudo configurado. Agora entre com a conta Google onde ficam as entregas.
-          O navegador vai abrir; depois de permitir, volte para cá.</p>
-        <button class="destaque" style="width:100%" onclick="entrarDrive()">Entrar com Google</button>
-      </div>
-      <div id="driveConectado" style="display:none">
-        <p class="dica"><span class="ok">● Conectado</span> <span id="driveConta"></span></p>
-        <button class="fantasma" onclick="sairDrive()">Sair da conta</button>
-      </div>
-      <p class="dica" id="driveMsg"></p>
-    </section>
+    <!-- conexão com o Google: aba Drive -->
 
     <section class="bloco-fixo">
       <h3 class="titulo-cartao">Novo projeto</h3>

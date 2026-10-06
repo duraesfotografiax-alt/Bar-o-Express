@@ -48,6 +48,9 @@ const num = (v, casas = 2) => Number(v).toLocaleString("pt-BR", {maximumFraction
 
 // ------------------------------------------------------------------ utilidades
 async function api(url, corpo) {
+  // toda chamada leva a empresa escolhida (Durães ou Elite)
+  url += (url.includes("?") ? "&" : "?") + "empresa=" + empresa;
+  if (corpo && typeof corpo === "object" && !Array.isArray(corpo)) corpo = {empresa, ...corpo};
   const r = await fetch(url, corpo === undefined ? {} : {
     method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(corpo)});
   const dados = await r.json();
@@ -1083,10 +1086,12 @@ let pollEnvio = null, envioAtual = {};
 function trocarModo(modo) {
   document.querySelectorAll(".modos button").forEach(b => b.classList.toggle("ativo", b.dataset.modo === modo));
   $("telaEdicao").style.display = modo === "edicao" ? "" : "none";
+  $("telaDrive").style.display = modo === "drive" ? "" : "none";
+  if (modo === "drive") { atualizarDrive().then(e => e.conectado && abrirPasta(dadosPasta ? dadosPasta.pasta.id : "")); acompanharEnvio(); }
   $("telaClientes").style.display = modo === "clientes" ? "" : "none";
   $("telaAlbum").style.display = modo === "album" ? "" : "none";
-  $("passos").style.display = modo === "edicao" ? "" : "none";
-  $("btnProcessar").style.display = modo === "edicao" ? "" : "none";
+  $("passos").style.display = "none";
+  $("btnProcessar").style.display = "none";
   if (modo === "clientes") { atualizarDrive(); carregarProjetos(); acompanharEnvio(); }
   if (modo === "album") carregarAlbuns();
 }
@@ -1096,6 +1101,7 @@ async function atualizarDrive() {
   $("driveDesconectado").style.display = e.configurado && !e.conectado ? "" : "none";
   $("driveConectado").style.display = e.conectado ? "" : "none";
   $("driveConta").textContent = e.conta || "";
+  $("driveAcessoParcial").style.display = e.conectado && !e.acesso_total ? "" : "none";
   return e;
 }
 async function configurarDrive() {
@@ -1137,7 +1143,7 @@ async function criarProjeto() {
 }
 function mensagemCliente(p) {
   return `Olá! As fotos de ${p.nome} estão prontas 📸\n` +
-    `${p.permitir_download ? "Você pode ver e baixar" : "Você pode ver"} todas aqui: ${p.link}\n\nDurães Fotografia`;
+    `${p.permitir_download ? "Você pode ver e baixar" : "Você pode ver"} todas aqui: ${p.link}\n\n${NOMES_EMPRESA[empresa]}`;
 }
 async function carregarProjetos() {
   const lista = await api("/api/projetos");
@@ -1225,6 +1231,7 @@ function acompanharEnvio() {
         aviso(envioAtual.mensagem, envioAtual.estado === "erro");
     }
     if ($("telaClientes").style.display !== "none") carregarProjetos();
+    mostrarEnvioPasta();
   }, 1200);
 }
 function criarEntregaDoLote() {
@@ -1234,7 +1241,181 @@ function criarEntregaDoLote() {
   $("pjNome").value = $("prefixo").value.replace(/_/g, " ");
 }
 
+// ------------------------------------------------------------------- empresa
+const NOMES_EMPRESA = {duraes: "Durães Fotografia", elite: "Elite Marketing Digital"};
+let empresa = "duraes";
+try { empresa = localStorage.getItem("duraes_empresa") || ""; } catch (e) {}
+function aplicarEmpresa() {
+  document.body.classList.toggle("elite", empresa === "elite");
+  $("marcaImg").src = empresa === "elite" ? "/estatico/marca/elite_simbolo.jpg" : "/estatico/marca/simbolo.png";
+  $("marcaNome").textContent = NOMES_EMPRESA[empresa];
+  document.title = NOMES_EMPRESA[empresa] + " · Entregas";
+}
+function mostrarEntrada() { $("telaEmpresa").style.display = ""; }
+function escolherEmpresa(e) {
+  empresa = e;
+  try { localStorage.setItem("duraes_empresa", e); } catch (err) {}
+  aplicarEmpresa();
+  $("telaEmpresa").style.display = "none";
+  dadosPasta = null;
+  trocarModo("drive");
+}
+
+// ------------------------------------------------------------------- aba Drive
+let dadosPasta = null;
+async function abrirPasta(id) {
+  $("driveInfo").textContent = "Carregando…";
+  try { dadosPasta = await api("/api/pastas" + (id ? "?id=" + encodeURIComponent(id) : "")); }
+  catch (e) { $("driveInfo").innerHTML = `<span class="erro">${esc(e.message)}</span>`; return; }
+  const d = dadosPasta;
+  d.pasta_link = "https://drive.google.com/drive/folders/" + d.pasta.id;
+  $("trilha").innerHTML = d.caminho.map((c, i) => i === d.caminho.length - 1
+    ? `<b>${esc(c.name)}</b>` : `<a href="#" onclick="abrirPasta('${c.id}'); return false">${esc(c.name)}</a>`).join(" › ");
+  const pastas = d.itens.filter(i => i.pasta), arquivos = d.itens.filter(i => !i.pasta);
+  const fotos = arquivos.filter(i => i.imagem).length, videos = arquivos.filter(i => i.video).length;
+  $("driveInfo").textContent = [pastas.length && `${pastas.length} pasta${pastas.length > 1 ? "s" : ""}`,
+    fotos && `${fotos} foto${fotos > 1 ? "s" : ""}`, videos && `${videos} vídeo${videos > 1 ? "s" : ""}`]
+    .filter(Boolean).join(" · ") || "Pasta vazia. Crie uma pasta para o cliente ou envie fotos e vídeos para cá.";
+  $("driveGrade").innerHTML = d.itens.map(i => i.pasta
+    ? `<div class="item-drive pasta" ondblclick="abrirPasta('${i.id}')" onclick="abrirPasta('${i.id}')" title="${esc(i.nome)}">
+        <div class="icone-pasta">📁</div><span>${esc(i.nome)}</span></div>`
+    : `<div class="item-drive" title="${esc(i.nome)}" onclick="abrirLink('${esc(i.link || d.pasta_link)}')">
+        ${i.miniatura ? `<img loading="lazy" src="/api/pastas/miniatura/${i.id}?t=400">` : `<div class="icone-pasta">${i.video ? "🎬" : "📄"}</div>`}
+        ${i.video ? `<i class="selo-video">▶ vídeo</i>` : ""}<span>${esc(i.nome)}</span></div>`).join("");
+  mostrarPainelPasta();
+}
+function mostrarPainelPasta() {
+  const d = dadosPasta;
+  const ehRaiz = d.pasta.id === d.raiz;
+  $("painelPasta").style.display = "";
+  $("ppNome").textContent = d.pasta.name;
+  $("ppResumo").textContent = ehRaiz ? `Pasta principal da ${NOMES_EMPRESA[empresa]}. Crie uma pasta para cada cliente.`
+    : $("driveInfo").textContent;
+  $("ppSemLink").style.display = d.link ? "none" : "";
+  $("ppComLink").style.display = d.link ? "" : "none";
+  $("ppLink").value = d.link || "";
+  $("ppDownload").checked = !!(d.projeto && d.projeto.permitir_download);
+  $("ppLocal").value = (d.projeto && d.projeto.pasta) || "";
+  $("ppLimite").value = (d.projeto && d.projeto.album_limite) || "";
+  $("ppAlbum").style.display = d.link_album ? "" : "none";
+  $("ppPrincipal").style.display = ehRaiz ? "none" : "";
+  $("ppCliente").style.display = ehRaiz ? "none" : "";
+  mostrarEnvioPasta();
+}
+function mostrarEnvioPasta() {
+  if (!dadosPasta || !$("ppEnvio")) return;
+  const p = dadosPasta.projeto;
+  const ativo = envioAtual.estado === "enviando" && p && envioAtual.projeto === p.id;
+  $("ppEnvio").style.display = ativo ? "" : "none";
+  if (ativo) {
+    $("ppBarra").style.width = (100 * envioAtual.feitas / Math.max(1, envioAtual.total)) + "%";
+    $("ppEnvioMsg").textContent = `Enviando ${envioAtual.feitas} de ${envioAtual.total}…`;
+  }
+  if (p && envioAtual.projeto === p.id && envioAtual.estado === "concluido" && !mostrarEnvioPasta.feito) {
+    mostrarEnvioPasta.feito = true;
+    abrirPasta(dadosPasta.pasta.id);   // mostra as fotos novas e o link
+  }
+}
+async function novaPasta() {
+  const nome = prompt("Nome da pasta (ex.: Casamento Ana e João):");
+  if (!nome || !nome.trim()) return;
+  try {
+    const r = await api("/api/pastas", {nome: nome.trim(), pai: dadosPasta ? dadosPasta.pasta.id : ""});
+    aviso("Pasta criada");
+    abrirPasta(r.id);
+  } catch (e) { aviso(e.message, true); }
+}
+async function gerarLinkPasta() {
+  try { const r = await api(`/api/pastas/${dadosPasta.pasta.id}/link`, {}); dadosPasta.link = r.link; mostrarPainelPasta();
+        aviso("Link pronto para o cliente"); }
+  catch (e) { aviso(e.message, true); }
+}
+async function tirarLinkPasta() {
+  if (!confirm("Desativar o link? Quem tem o link não consegue mais abrir.")) return;
+  try { await fetch(`/api/pastas/${dadosPasta.pasta.id}/link?empresa=${empresa}`, {method: "DELETE"});
+        dadosPasta.link = null; mostrarPainelPasta(); aviso("Link desativado"); }
+  catch (e) { aviso(e.message, true); }
+}
+function mensagemPasta() {
+  const d = dadosPasta;
+  return `Olá! As fotos de ${d.pasta.name} estão prontas 📸\n` +
+    `${$("ppDownload").checked ? "Você pode ver e baixar" : "Você pode ver"} todas aqui: ${d.link}\n\n${NOMES_EMPRESA[empresa]}`;
+}
+async function copiarLinkPasta() {
+  try { await navigator.clipboard.writeText(mensagemPasta()); aviso("Mensagem com o link copiada"); }
+  catch (e) { $("ppLink").select(); document.execCommand("copy"); aviso("Link copiado"); }
+}
+function whatsappPasta() { abrirLink("https://wa.me/?text=" + encodeURIComponent(mensagemPasta())); }
+async function downloadPasta(caixa) {
+  try { const r = await api(`/api/pastas/${dadosPasta.pasta.id}/download`, {permitir: caixa.checked});
+        aviso(caixa.checked ? `Download liberado (${r.arquivos} arquivos)` : `Só visualizar (${r.arquivos} arquivos)`); }
+  catch (e) { caixa.checked = !caixa.checked; aviso(e.message, true); }
+}
+async function escolherLocalPasta() {
+  const p = await dialogo("pasta");
+  if (p) $("ppLocal").value = p;
+}
+async function enviarParaPasta() {
+  let local = $("ppLocal").value.trim();
+  if (!local) { await escolherLocalPasta(); local = $("ppLocal").value.trim(); }
+  if (!local) return;
+  try {
+    await api(`/api/pastas/${dadosPasta.pasta.id}/enviar`, {nome: dadosPasta.pasta.name, pasta_local: local,
+      tamanho: $("ppTamanho").value, permitir_download: $("ppDownload").checked});
+    mostrarEnvioPasta.feito = false;
+    aviso("Enviando… pode continuar usando o programa");
+    dadosPasta = await api("/api/pastas?id=" + encodeURIComponent(dadosPasta.pasta.id)).then(d => ({...d,
+      pasta_link: "https://drive.google.com/drive/folders/" + d.pasta.id}));
+    acompanharEnvio();
+  } catch (e) { aviso(e.message, true); }
+}
+async function albumPasta() {
+  try {
+    const r = await api(`/api/pastas/${dadosPasta.pasta.id}/album`, {nome: dadosPasta.pasta.name,
+      limite: +$("ppLimite").value || 0});
+    dadosPasta.projeto = r.projeto; dadosPasta.link_album = r.link;
+    mostrarPainelPasta();
+    aviso(r.link ? "Seleção do álbum liberada. Mande o link para o cliente."
+      : "Seleção liberada. Configure a página de seleção na aba Álbum para gerar o link.", !r.link);
+  } catch (e) { aviso(e.message, true); }
+}
+function mensagemAlbumPasta() {
+  const lim = +$("ppLimite").value || 0;
+  return `Olá! Chegou a hora de escolher as fotos do álbum de *${dadosPasta.pasta.name}* 📖\n` +
+    `${lim ? `Escolha ${lim} fotos` : "Escolha suas fotos favoritas"} neste link (funciona no celular):\n${dadosPasta.link_album}\n` +
+    `Toque no círculo de cada foto para marcar e, no fim, em *Enviar seleção*.\n— ${NOMES_EMPRESA[empresa]}`;
+}
+async function copiarAlbumPasta() {
+  try { await navigator.clipboard.writeText(mensagemAlbumPasta()); aviso("Mensagem do álbum copiada"); }
+  catch (e) { aviso("Não consegui copiar", true); }
+}
+function whatsappAlbumPasta() { abrirLink("https://wa.me/?text=" + encodeURIComponent(mensagemAlbumPasta())); }
+async function renomearPasta() {
+  const nome = prompt("Novo nome da pasta:", dadosPasta.pasta.name);
+  if (!nome || !nome.trim()) return;
+  try { await api(`/api/pastas/${dadosPasta.pasta.id}/renomear`, {nome: nome.trim()}); abrirPasta(dadosPasta.pasta.id); }
+  catch (e) { aviso(e.message, true); }
+}
+async function definirPrincipal() {
+  if (!confirm(`Usar "${dadosPasta.pasta.name}" como pasta principal da ${NOMES_EMPRESA[empresa]}?`)) return;
+  await api(`/api/pastas/${dadosPasta.pasta.id}/principal`, {});
+  aviso("Pasta principal definida"); abrirPasta("");
+}
+async function lixeiraPasta() {
+  if (!confirm(`Mover "${dadosPasta.pasta.name}" para a lixeira do Drive? (dá para recuperar pelo Drive por 30 dias)`)) return;
+  const r = await fetch(`/api/pastas/${dadosPasta.pasta.id}?empresa=${empresa}`, {method: "DELETE"});
+  const j = await r.json();
+  if (!r.ok) { aviso(j.erro, true); return; }
+  aviso("Pasta movida para a lixeira");
+  const pai = dadosPasta.caminho.length > 1 ? dadosPasta.caminho[dadosPasta.caminho.length - 2].id : "";
+  abrirPasta(pai);
+}
+
 // ------------------------------------------------------------------- início
+aplicarEmpresa();
+if (empresa) { $("telaEmpresa").style.display = "none"; }
+else { empresa = "duraes"; aplicarEmpresa(); }
+trocarModo("drive");
 montarSliders();
 mostrarModoIA();
 ligarCurva();
@@ -1346,7 +1527,7 @@ function mensagemAlbum(id) {
   const p = window._albuns[id], lim = p.album_limite;
   return `Olá! Chegou a hora de escolher as fotos do álbum de *${p.nome}* 📖\n` +
     `${lim ? `Escolha ${lim} fotos` : "Escolha suas fotos favoritas"} neste link (funciona no celular):\n${window._linksAlbum[id]}\n` +
-    `Toque no círculo de cada foto para marcar e, no fim, em *Enviar seleção*.\n— Durães Fotografia`;
+    `Toque no círculo de cada foto para marcar e, no fim, em *Enviar seleção*.\n— ${NOMES_EMPRESA[empresa]}`;
 }
 async function copiarLinkAlbum(id) {
   try { await navigator.clipboard.writeText(mensagemAlbum(id)); aviso("Mensagem com o link copiada"); }

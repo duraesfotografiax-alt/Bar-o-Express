@@ -2,5 +2,3 @@ pillow>=10.1
 numpy>=1.24
 flask>=3.0
 pywebview>=5.0; sys_platform == "win32"
-onnxruntime>=1.17
-opencv-contrib-python-headless>=4.8

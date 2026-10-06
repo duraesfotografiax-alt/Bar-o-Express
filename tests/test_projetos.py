@@ -83,17 +83,25 @@ class DriveFalso:
             return 200, {}, json.dumps({"id": fid}).encode()
         if u.path == "/drive/v3/files" and metodo == "GET":
             pai = q["q"].split("'")[1]
-            itens = [{"id": i, "name": a["name"]} for i, a in self.arquivos.items()
-                     if pai in a.get("parents", []) and not a["trashed"]]
+            itens = [{"id": i, "name": a["name"], "mimeType": a.get("mimeType", "image/jpeg")}
+                     for i, a in self.arquivos.items() if pai in a.get("parents", []) and not a["trashed"]]
             return 200, {}, json.dumps({"files": itens}).encode()
         if len(partes) >= 6 and partes[5] == "permissions":
+            if metodo == "GET":
+                perms = [{"id": f"p{i}", **p} for i, p in enumerate(self.permissoes.get(partes[4], []))]
+                return 200, {}, json.dumps({"permissions": perms}).encode()
+            if metodo == "DELETE":
+                self.permissoes[partes[4]] = []
+                return 204, {}, b""
             self.permissoes.setdefault(partes[4], []).append(json.loads(corpo))
             return 200, {}, b'{"id":"p1"}'
         fid = partes[4]
         if fid not in self.arquivos:
             return 404, {}, b"{}"
         if metodo == "GET":
-            return 200, {}, json.dumps({"id": fid, "trashed": self.arquivos[fid]["trashed"]}).encode()
+            a = self.arquivos[fid]
+            return 200, {}, json.dumps({"id": fid, "trashed": a["trashed"], "name": a["name"],
+                                        "mimeType": a.get("mimeType", ""), "parents": a.get("parents", [])}).encode()
         if metodo == "PATCH":
             mudanca = json.loads(corpo)
             # como o Google: essa opção não existe para pastas
@@ -146,7 +154,7 @@ def test_projeto_completo(ambiente):
     pasta = projeto["drive_pasta"]
     assert falso.arquivos[pasta]["name"] == "Casamento Ana e João"
     raiz = falso.arquivos[pasta]["parents"][0]
-    assert falso.arquivos[raiz]["name"] == "Durães APP · Clientes"
+    assert falso.arquivos[raiz]["name"] == "Durães Fotografia"
     assert falso.permissoes[pasta] == [{"type": "anyone", "role": "reader"}]
     enviadas = falso.fotos_em(pasta)
     assert len(enviadas) == 7
@@ -215,7 +223,7 @@ def test_login_com_pkce(monkeypatch):
     login = Login(CLIENTE["installed"], "http://127.0.0.1:5000/api/drive/retorno")
     url = urllib.parse.urlparse(login.url())
     q = dict(urllib.parse.parse_qsl(url.query))
-    assert q["scope"] == "https://www.googleapis.com/auth/drive.file"
+    assert q["scope"] == "https://www.googleapis.com/auth/drive"
     assert q["code_challenge_method"] == "S256" and q["redirect_uri"].startswith("http://127.0.0.1:")
     with pytest.raises(ErroDrive, match="estado"):
         login.trocar_codigo("codigo", "estado-errado")
@@ -293,3 +301,64 @@ def test_album_selecao_do_cliente(ambiente, tmp_path):
     assert json.loads(falso.arquivos[arquivo]["conteudo"])["finalizado"] is False
     r = pj.separar_album(projeto["id"], ["casamento_0005.JPG", "nao_existe.jpg"])
     assert r["copiadas"] == 1 and r["faltando"] == ["nao_existe.jpg"]
+
+
+def test_empresas_e_pastas_do_drive(ambiente, tmp_path):
+    pj, falso, fotos = ambiente
+    # Elite: pasta principal própria
+    p = pj.criar("Lançamento Loja X", str(fotos), empresa="elite")
+    pj.enviar(p["id"])
+    assert esperar(pj)["estado"] == "concluido"
+    pasta = pj.obter(p["id"])["drive_pasta"]
+    raiz = falso.arquivos[pasta]["parents"][0]
+    assert falso.arquivos[raiz]["name"] == "Elite Marketing Digital"
+    assert pj.raiz_empresa("elite") == raiz and pj.raiz_empresa("duraes") == ""
+    assert [x["nome"] for x in pj.listar_empresa("elite")] == ["Lançamento Loja X"]
+    assert pj.listar_empresa("duraes") == []
+
+    # aba Drive: pasta que já existe -> enviar fotos para ela, sem duplicar o que já está lá
+    drive = pj.drive()
+    existente = drive.criar_pasta("Ensaio Maria", raiz)
+    drive.enviar_foto("Casamento_0000.jpg", b"ja estava", existente, False)
+    assert drive.link_publico(existente) is None
+    pj.enviar_para_pasta(existente, "Ensaio Maria", "elite", str(fotos))
+    assert esperar(pj)["estado"] == "concluido"
+    nomes = [a["name"] for a in falso.fotos_em(existente)]
+    assert len(nomes) == 7 and nomes.count("Casamento_0000.jpg") == 1
+    proj = pj.projeto_da_pasta(existente)
+    assert proj["link"] and drive.link_publico(existente)
+    caminho = drive.caminho(existente)
+    assert [c["name"] for c in caminho] == ["Elite Marketing Digital", "Ensaio Maria"]
+    drive.tirar_link(existente)
+    assert drive.link_publico(existente) is None
+    drive.renomear(existente, "Ensaio Maria 2026")
+    assert falso.arquivos[existente]["name"] == "Ensaio Maria 2026"
+    itens = drive.itens(existente)
+    assert len(itens) == 7
+
+
+def test_rotas_da_aba_drive(ambiente, monkeypatch):
+    from editalote import servidor
+
+    pj, falso, fotos = ambiente
+    monkeypatch.setattr(servidor, "projetos", pj)
+    c = servidor.app.test_client()
+    r = c.get("/api/pastas?empresa=elite").get_json()
+    raiz = r["raiz"]
+    assert r["pasta"]["name"] == "Elite Marketing Digital" and r["itens"] == []
+    nova = c.post("/api/pastas", json={"nome": "Cliente Novo", "pai": raiz, "empresa": "elite"}).get_json()["id"]
+    r = c.get("/api/pastas?empresa=elite").get_json()
+    assert [i["nome"] for i in r["itens"]] == ["Cliente Novo"]
+    link = c.post(f"/api/pastas/{nova}/link").get_json()["link"]
+    assert nova in link
+    r = c.get(f"/api/pastas?empresa=elite&id={nova}").get_json()
+    assert r["link"] and [x["name"] for x in r["caminho"]] == ["Elite Marketing Digital", "Cliente Novo"]
+    assert c.post(f"/api/pastas/{nova}/enviar", json={"empresa": "elite", "nome": "Cliente Novo",
+                                                       "pasta_local": str(fotos)}).status_code == 200
+    assert esperar(pj)["estado"] == "concluido"
+    r = c.get(f"/api/pastas?empresa=elite&id={nova}").get_json()
+    assert len(r["itens"]) == 7 and r["projeto"]["empresa"] == "elite"
+    assert c.post(f"/api/pastas/{nova}/download", json={"permitir": True}).get_json()["arquivos"] == 7
+    assert c.delete(f"/api/pastas/{raiz}?empresa=elite").status_code == 400      # a principal não
+    assert c.get("/api/projetos?empresa=elite").get_json()[0]["nome"] == "Cliente Novo"
+    assert c.get("/api/projetos?empresa=duraes").get_json() == []

@@ -13,13 +13,14 @@ import tempfile
 import threading
 import unicodedata
 import webbrowser
+from concurrent.futures import ThreadPoolExecutor
 
 from flask import Flask, abort, jsonify, request, send_file, send_from_directory
 from PIL import Image
 
 from . import estilo_ia, nuvem
 from .drive import ErroDrive, Login
-from .projetos import Projetos
+from .projetos import EMPRESAS, Projetos
 from .lightroom import aprender, presets_instalados
 from .lote import OPCOES_PADRAO, Trabalho, resumo_pasta
 from .metadados import EXTENSOES
@@ -398,9 +399,177 @@ def drive_sair():
     return jsonify(projetos.conexao())
 
 
+def _empresa() -> str:
+    e = request.args.get("empresa") or (request.get_json(silent=True) or {}).get("empresa") or "duraes"
+    return e if e in EMPRESAS else "duraes"
+
+
 @app.get("/api/projetos")
 def projetos_listar():
-    return jsonify(projetos.listar())
+    return jsonify(projetos.listar_empresa(_empresa()))
+
+
+# ------------------------------------------------------------- aba Drive (navegar nas pastas)
+PASTA_MIME = "application/vnd.google-apps.folder"
+_miniaturas: dict = {}
+
+
+def _item(i: dict) -> dict:
+    mime = i.get("mimeType", "")
+    alvo = (i.get("shortcutDetails") or {})
+    return {"id": alvo.get("targetId") or i["id"], "nome": i.get("name", ""), "mime": alvo.get("targetMimeType") or mime,
+            "pasta": (alvo.get("targetMimeType") or mime) == PASTA_MIME, "tamanho": int(i.get("size") or 0),
+            "video": mime.startswith("video/"), "imagem": mime.startswith("image/"),
+            "miniatura": bool(i.get("thumbnailLink")), "modificado": i.get("modifiedTime", ""),
+            "link": i.get("webViewLink", "")}
+
+
+@app.get("/api/pastas")
+def pastas_listar():
+    """Conteúdo de uma pasta do Drive. Sem id: a pasta principal da empresa (criada se preciso)."""
+    try:
+        drive = projetos.drive()
+        empresa = _empresa()
+        raiz = projetos._pasta_raiz(drive, empresa)
+        pasta = request.args.get("id") or raiz
+        itens = drive.itens(pasta)
+        for i in itens:
+            if i.get("thumbnailLink"):
+                _miniaturas[i["id"]] = i["thumbnailLink"]
+        caminho = drive.caminho(pasta, ate=raiz)
+        projeto = projetos.projeto_da_pasta(pasta)
+        return jsonify({"pasta": caminho[-1] if caminho else {"id": pasta, "name": ""}, "caminho": caminho,
+                        "raiz": raiz, "itens": [_item(i) for i in itens],
+                        "link": drive.link_publico(pasta) if pasta != raiz else None,
+                        "projeto": projeto, "link_album": projetos.link_album(projeto) if projeto else ""})
+    except ErroDrive as erro:
+        return _erro(erro)
+
+
+@app.get("/api/pastas/miniatura/<arquivo_id>")
+def pastas_miniatura(arquivo_id):
+    url = _miniaturas.get(arquivo_id)
+    if not url:
+        abort(404)
+    tamanho = request.args.get("t", "400")
+    url = re.sub(r"=s\d+$", f"=s{int(tamanho)}", url)
+    try:
+        dados, tipo = projetos.drive().baixar_miniatura(url)
+    except ErroDrive:
+        abort(404)
+    resposta = send_file(io.BytesIO(dados), mimetype=tipo)
+    resposta.headers["Cache-Control"] = "private, max-age=3000"
+    return resposta
+
+
+@app.post("/api/pastas")
+def pastas_criar():
+    dados = request.json or {}
+    nome = (dados.get("nome") or "").strip()
+    if not nome:
+        return jsonify({"erro": "Dê um nome para a pasta"}), 400
+    try:
+        drive = projetos.drive()
+        pai = dados.get("pai") or projetos._pasta_raiz(drive, _empresa())
+        return jsonify({"id": drive.criar_pasta(nome, pai)})
+    except ErroDrive as erro:
+        return _erro(erro)
+
+
+@app.post("/api/pastas/<pasta_id>/link")
+def pastas_link(pasta_id):
+    try:
+        drive = projetos.drive()
+        link = drive.compartilhar_com_link(pasta_id)
+        projeto = projetos.projeto_da_pasta(pasta_id)
+        if projeto:
+            projetos._atualizar(projeto["id"], link=link)
+        return jsonify({"link": link})
+    except ErroDrive as erro:
+        return _erro(erro)
+
+
+@app.delete("/api/pastas/<pasta_id>/link")
+def pastas_tirar_link(pasta_id):
+    try:
+        projetos.drive().tirar_link(pasta_id)
+        return jsonify({"ok": True})
+    except ErroDrive as erro:
+        return _erro(erro)
+
+
+@app.post("/api/pastas/<pasta_id>/download")
+def pastas_download(pasta_id):
+    """Liga/desliga o download para o cliente (vale para cada arquivo da pasta)."""
+    permitir = bool((request.json or {}).get("permitir"))
+    try:
+        drive = projetos.drive()
+        itens = [i for i in drive.itens(pasta_id) if i.get("mimeType") != PASTA_MIME]
+        with ThreadPoolExecutor(max_workers=4) as ex:
+            list(ex.map(lambda i: drive.permitir_download(i["id"], permitir), itens))
+        projeto = projetos.projeto_da_pasta(pasta_id)
+        if projeto:
+            projetos._atualizar(projeto["id"], permitir_download=permitir)
+        return jsonify({"ok": True, "arquivos": len(itens)})
+    except ErroDrive as erro:
+        return _erro(erro)
+
+
+@app.post("/api/pastas/<pasta_id>/renomear")
+def pastas_renomear(pasta_id):
+    nome = ((request.json or {}).get("nome") or "").strip()
+    if not nome:
+        return jsonify({"erro": "Nome vazio"}), 400
+    try:
+        projetos.drive().renomear(pasta_id, nome)
+        projeto = projetos.projeto_da_pasta(pasta_id)
+        if projeto:
+            projetos._atualizar(projeto["id"], nome=nome)
+        return jsonify({"ok": True})
+    except ErroDrive as erro:
+        return _erro(erro)
+
+
+@app.delete("/api/pastas/<pasta_id>")
+def pastas_lixeira(pasta_id):
+    try:
+        if pasta_id == projetos.raiz_empresa(_empresa()):
+            return jsonify({"erro": "Essa é a pasta principal da empresa"}), 400
+        projetos.drive().mover_para_lixeira(pasta_id)
+        return jsonify({"ok": True})
+    except ErroDrive as erro:
+        return _erro(erro)
+
+
+@app.post("/api/pastas/<pasta_id>/enviar")
+def pastas_enviar(pasta_id):
+    """Envia fotos e vídeos de uma pasta do computador para esta pasta do Drive."""
+    dados = request.json or {}
+    try:
+        projetos.enviar_para_pasta(pasta_id, dados.get("nome") or "Cliente", _empresa(),
+                                   dados.get("pasta_local", ""), dados.get("tamanho", "original"),
+                                   bool(dados.get("permitir_download")))
+        return jsonify({"ok": True, "projeto": projetos.projeto_da_pasta(pasta_id)})
+    except (ValueError, ErroDrive) as erro:
+        return _erro(erro)
+
+
+@app.post("/api/pastas/<pasta_id>/principal")
+def pastas_principal(pasta_id):
+    projetos.definir_raiz(_empresa(), pasta_id)
+    return jsonify({"ok": True})
+
+
+@app.post("/api/pastas/<pasta_id>/album")
+def pastas_album(pasta_id):
+    """Libera a seleção do álbum para uma pasta do Drive (cria o projeto se preciso)."""
+    dados = request.json or {}
+    try:
+        projeto = projetos.vincular(pasta_id, dados.get("nome") or "Cliente", _empresa())
+        projeto = projetos.ativar_album(projeto["id"], dados.get("limite", 0))
+        return jsonify({"projeto": projeto, "link": projetos.link_album(projeto)})
+    except (ValueError, ErroDrive) as erro:
+        return _erro(erro)
 
 
 @app.post("/api/projetos")
@@ -408,7 +577,8 @@ def projetos_criar():
     dados = request.json or {}
     try:
         projeto = projetos.criar(dados.get("nome", ""), dados.get("pasta", ""),
-                                 dados.get("tamanho", "original"), bool(dados.get("permitir_download")))
+                                 dados.get("tamanho", "original"), bool(dados.get("permitir_download")),
+                                 empresa=_empresa(), pai=dados.get("pai", ""))
         if dados.get("enviar", True):
             projetos.enviar(projeto["id"])
     except (ValueError, ErroDrive) as erro:
@@ -493,11 +663,12 @@ def album_reabrir(pid):
 @app.post("/api/projetos/<pid>/album/separar")
 def album_separar(pid):
     nomes = (request.json or {}).get("nomes")
+    pasta_local = (request.json or {}).get("pasta_local", "")
     if isinstance(nomes, str):   # lista colada (WhatsApp): um nome por linha, vírgula ou espaço
         import re
 
         nomes = [n for n in re.split(r"[\s,;]+", nomes) if n]
-    return _resposta_album(pid, lambda: projetos.separar_album(pid, nomes))
+    return _resposta_album(pid, lambda: projetos.separar_album(pid, nomes, pasta_local))
 
 
 @app.get("/api/projetos/envio")
