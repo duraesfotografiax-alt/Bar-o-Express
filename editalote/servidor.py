@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unicodedata
 import webbrowser
 from concurrent.futures import ThreadPoolExecutor
@@ -412,6 +413,7 @@ def projetos_listar():
 # ------------------------------------------------------------- aba Drive (navegar nas pastas)
 PASTA_MIME = "application/vnd.google-apps.folder"
 _miniaturas: dict = {}
+_miniaturas_bytes: dict = {}
 
 
 def _item(i: dict) -> dict:
@@ -424,26 +426,46 @@ def _item(i: dict) -> dict:
             "link": i.get("webViewLink", "")}
 
 
+_raizes_ok: dict = {}
+
+
+def _raiz_conferida(drive, empresa: str) -> str:
+    """Pasta principal da empresa, conferida no Google só uma vez a cada 10 minutos."""
+    raiz = projetos.raiz_empresa(empresa)
+    if raiz and time.time() - _raizes_ok.get(raiz, 0) < 600:
+        return raiz
+    raiz = projetos._pasta_raiz(drive, empresa)
+    _raizes_ok[raiz] = time.time()
+    return raiz
+
+
 @app.get("/api/pastas")
 def pastas_listar():
     """Conteúdo de uma pasta do Drive. Sem id: a pasta principal da empresa (criada se preciso)."""
     try:
         drive = projetos.drive()
         empresa = _empresa()
-        raiz = projetos._pasta_raiz(drive, empresa)
+        raiz = _raiz_conferida(drive, empresa)
         pasta = request.args.get("id") or raiz
         meu_drive = pasta == "root"
-        itens = drive.itens(pasta)
+        # as consultas ao Google em paralelo (cada uma leva ~0,2–0,5 s)
+        with ThreadPoolExecutor(max_workers=3) as ex:
+            f_itens = ex.submit(drive.itens, pasta)
+            f_caminho = None if meu_drive else ex.submit(drive.caminho, pasta)
+            f_link = ex.submit(drive.link_publico, pasta) if pasta not in (raiz, "root") else None
+            itens = f_itens.result()
+            caminho_drive = f_caminho.result() if f_caminho else None
+            link = f_link.result() if f_link else None
         for i in itens:
             if i.get("thumbnailLink"):
                 _miniaturas[i["id"]] = i["thumbnailLink"]
-        caminho = [{"id": "root", "name": "Meu Drive"}] if meu_drive else drive.caminho(pasta)
+        caminho = [{"id": "root", "name": "Meu Drive"}] if meu_drive else caminho_drive
         if caminho and caminho[0]["id"] != "root" and caminho[0].get("name") in ("Meu Drive", "My Drive"):
             caminho[0] = {"id": "root", "name": "Meu Drive"}
         projeto = None if meu_drive else projetos.projeto_da_pasta(pasta)
         return jsonify({"pasta": caminho[-1] if caminho else {"id": pasta, "name": ""}, "caminho": caminho,
                         "raiz": raiz, "meu_drive": meu_drive, "itens": [_item(i) for i in itens],
-                        "link": drive.link_publico(pasta) if pasta not in (raiz, "root") else None,
+                        "link": link,
                         "projeto": projeto, "link_album": projetos.link_album(projeto) if projeto else ""})
     except ErroDrive as erro:
         return _erro(erro)
@@ -456,10 +478,17 @@ def pastas_miniatura(arquivo_id):
         abort(404)
     tamanho = request.args.get("t", "400")
     url = re.sub(r"=s\d+$", f"=s{int(tamanho)}", url)
-    try:
-        dados, tipo = projetos.drive().baixar_miniatura(url)
-    except ErroDrive:
-        abort(404)
+    guardada = _miniaturas_bytes.get(url)
+    if guardada:
+        dados, tipo = guardada
+    else:
+        try:
+            dados, tipo = projetos.drive().baixar_miniatura(url)
+        except ErroDrive:
+            abort(404)
+        _miniaturas_bytes[url] = (dados, tipo)
+        while len(_miniaturas_bytes) > 1500:   # ~30 MB no máximo
+            _miniaturas_bytes.pop(next(iter(_miniaturas_bytes)))
     resposta = send_file(io.BytesIO(dados), mimetype=tipo)
     resposta.headers["Cache-Control"] = "private, max-age=3000"
     return resposta
@@ -529,6 +558,24 @@ def pastas_renomear(pasta_id):
         if projeto:
             projetos._atualizar(projeto["id"], nome=nome)
         return jsonify({"ok": True})
+    except ErroDrive as erro:
+        return _erro(erro)
+
+
+@app.post("/api/pastas/lixeira")
+def pastas_lixeira_varias():
+    """Move vários itens (pastas, fotos, vídeos) para a lixeira do Drive."""
+    ids = [str(i) for i in (request.json or {}).get("ids") or []]
+    protegidas = {projetos.raiz_empresa(e) for e in EMPRESAS} | {"root"}
+    if any(i in protegidas for i in ids):
+        return jsonify({"erro": "A pasta principal de uma empresa não pode ir para a lixeira"}), 400
+    try:
+        drive = projetos.drive()
+        with ThreadPoolExecutor(max_workers=4) as ex:
+            list(ex.map(drive.mover_para_lixeira, ids))
+        for i in ids:
+            drive.esquecer(i)
+        return jsonify({"ok": True, "quantos": len(ids)})
     except ErroDrive as erro:
         return _erro(erro)
 

@@ -128,6 +128,14 @@
       <button class="fantasma" onclick="abrirPasta(dadosPasta && dadosPasta.pasta.id)" title="Atualizar">↻</button>
     </div>
     <p class="dica" id="driveInfo"></p>
+    <div class="barra-selecao" id="barraSelecao" style="display:none">
+      <b id="qtdSelecao"></b>
+      <button id="selAbrir" onclick="abrirSelecionada()">Abrir</button>
+      <button id="selRenomear" onclick="renomearSelecionada()">Renomear</button>
+      <button class="perigo" onclick="lixeiraSelecionadas()">🗑 Mover para a lixeira</button>
+      <button class="fantasma" onclick="limparSelecao()">Cancelar</button>
+      <span class="dica">Ctrl ou Shift: selecionar vários · Delete: lixeira · Enter: abrir</span>
+    </div>
     <div class="drive-grade" id="driveGrade"></div>
   </main>
 </div>

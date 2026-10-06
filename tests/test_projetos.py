@@ -123,6 +123,9 @@ def ambiente(tmp_path, monkeypatch):
     falso = DriveFalso()
     monkeypatch.setattr(drive_mod, "http", falso)
     monkeypatch.setattr(drive_mod, "ESPERA_INICIAL", 0)
+    monkeypatch.setattr(drive_mod, "_info_cache", {})
+    from editalote import servidor
+    monkeypatch.setattr(servidor, "_raizes_ok", {})
     (tmp_path / "cliente.json").write_text(json.dumps(CLIENTE))
     fotos = tmp_path / "Casamento Ana e João"
     (fotos / "_revisar_desfocadas").mkdir(parents=True)

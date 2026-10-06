@@ -385,3 +385,14 @@ body.elite .lateral, body.elite .topo { background-color: rgba(8, 10, 18, .88); 
 #painelPasta h4 { margin: 16px 0 6px; }
 #painelPasta input.link { width: 100%; }
 button.perigo { color: var(--erro); }
+.item-drive { user-select: none; }
+.item-drive .marca-sel { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%;
+  display: none; align-items: center; justify-content: center; font-style: normal; font-size: 13px; font-weight: 700;
+  background: var(--laranja); color: #1c0c00; z-index: 2; }
+.item-drive.sel { border-color: var(--laranja); box-shadow: 0 0 0 2px var(--laranja); }
+.item-drive.sel .marca-sel { display: flex; }
+.item-drive.sel img { opacity: .8; }
+.barra-selecao { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; padding: 8px 12px;
+  border: 1px solid var(--laranja); border-radius: 10px; background: var(--painel-2); }
+.barra-selecao b { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.barra-selecao .dica { margin: 0 0 0 auto; }

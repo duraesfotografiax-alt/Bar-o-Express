@@ -1263,13 +1263,40 @@ function escolherEmpresa(e) {
 
 // ------------------------------------------------------------------- aba Drive
 let dadosPasta = null;
-async function abrirPasta(id) {
-  $("driveInfo").textContent = "Carregando…";
-  try { dadosPasta = await api("/api/pastas" + (id ? "?id=" + encodeURIComponent(id) : "")); }
-  catch (e) { $("driveInfo").innerHTML = `<span class="erro">${esc(e.message)}</span>`; return; }
-  const d = dadosPasta;
+// cache por pasta: voltar para uma pasta já vista mostra na hora (e atualiza por trás)
+const cachePastas = {};
+let pedidoPasta = 0, selDrive = new Set(), ultimoSel = null;
+function chaveCache(id) { return empresa + ":" + (id || ""); }
+async function buscarPasta(id) {
+  const d = await api("/api/pastas" + (id ? "?id=" + encodeURIComponent(id) : ""));
   d.pasta_link = "https://drive.google.com/drive/folders/" + d.pasta.id;
   if (d.caminho[0] && d.caminho[0].id !== "root") d.caminho.unshift({id: "root", name: "Meu Drive"});
+  cachePastas[chaveCache(id)] = cachePastas[chaveCache(d.pasta.id)] = d;
+  return d;
+}
+async function abrirPasta(id) {
+  const meu = ++pedidoPasta;
+  selDrive.clear(); ultimoSel = null;
+  const guardada = cachePastas[chaveCache(id)];
+  if (guardada) { dadosPasta = guardada; desenharPasta(); $("driveInfo").textContent += "  ·  atualizando…"; }
+  else { $("driveInfo").textContent = "Carregando…"; $("driveGrade").style.opacity = .45; }
+  try {
+    const d = await buscarPasta(id);
+    if (meu !== pedidoPasta) return;   // já clicou em outra pasta
+    dadosPasta = d;
+    desenharPasta();
+  } catch (e) { if (meu === pedidoPasta) $("driveInfo").innerHTML = `<span class="erro">${esc(e.message)}</span>`; }
+  finally { if (meu === pedidoPasta) $("driveGrade").style.opacity = 1; }
+}
+// passar o mouse numa pasta já busca o conteúdo dela (o clique abre na hora)
+let timerPrevisao = null;
+function preverPasta(id) {
+  clearTimeout(timerPrevisao);
+  if (cachePastas[chaveCache(id)]) return;
+  timerPrevisao = setTimeout(() => buscarPasta(id).catch(() => {}), 180);
+}
+function desenharPasta() {
+  const d = dadosPasta;
   $("trilha").innerHTML = d.caminho.map((c, i) => i === d.caminho.length - 1
     ? `<b>${esc(c.name)}</b>` : `<a href="#" onclick="abrirPasta('${c.id}'); return false">${esc(c.name)}</a>`).join(" › ");
   const pastas = d.itens.filter(i => i.pasta), arquivos = d.itens.filter(i => !i.pasta);
@@ -1277,14 +1304,85 @@ async function abrirPasta(id) {
   $("driveInfo").textContent = [pastas.length && `${pastas.length} pasta${pastas.length > 1 ? "s" : ""}`,
     fotos && `${fotos} foto${fotos > 1 ? "s" : ""}`, videos && `${videos} vídeo${videos > 1 ? "s" : ""}`]
     .filter(Boolean).join(" · ") || "Pasta vazia. Crie uma pasta para o cliente ou envie fotos e vídeos para cá.";
-  $("driveGrade").innerHTML = d.itens.map(i => i.pasta
-    ? `<div class="item-drive pasta" ondblclick="abrirPasta('${i.id}')" onclick="abrirPasta('${i.id}')" title="${esc(i.nome)}">
-        <div class="icone-pasta">📁</div><span>${esc(i.nome)}</span></div>`
-    : `<div class="item-drive" title="${esc(i.nome)}" onclick="abrirLink('${esc(i.link || d.pasta_link)}')">
+  $("driveGrade").innerHTML = d.itens.map((i, n) => i.pasta
+    ? `<div class="item-drive pasta${selDrive.has(i.id) ? " sel" : ""}" data-n="${n}" onmouseenter="preverPasta('${i.id}')"
+        title="${esc(i.nome)} — dois cliques para abrir">
+        <i class="marca-sel">✓</i><div class="icone-pasta">📁</div><span>${esc(i.nome)}</span></div>`
+    : `<div class="item-drive${selDrive.has(i.id) ? " sel" : ""}" data-n="${n}" title="${esc(i.nome)} — dois cliques para ver no Drive">
+        <i class="marca-sel">✓</i>
         ${i.miniatura ? `<img loading="lazy" src="/api/pastas/miniatura/${i.id}?t=400">` : `<div class="icone-pasta">${i.video ? "🎬" : "📄"}</div>`}
         ${i.video ? `<i class="selo-video">▶ vídeo</i>` : ""}<span>${esc(i.nome)}</span></div>`).join("");
+  mostrarSelecao();
   mostrarPainelPasta();
 }
+function mostrarSelecao() {
+  document.querySelectorAll("#driveGrade .item-drive").forEach(el =>
+    el.classList.toggle("sel", selDrive.has(dadosPasta.itens[+el.dataset.n].id)));
+  const n = selDrive.size;
+  $("barraSelecao").style.display = n ? "" : "none";
+  if (!n) return;
+  const itens = dadosPasta.itens.filter(i => selDrive.has(i.id));
+  $("qtdSelecao").textContent = n === 1 ? itens[0].nome : `${n} itens selecionados`;
+  $("selAbrir").style.display = n === 1 ? "" : "none";
+  $("selRenomear").style.display = n === 1 ? "" : "none";
+}
+function limparSelecao() { selDrive.clear(); mostrarSelecao(); }
+function abrirItem(i) { i.pasta ? abrirPasta(i.id) : abrirLink(i.link || dadosPasta.pasta_link); }
+function abrirSelecionada() {
+  const i = dadosPasta.itens.find(x => selDrive.has(x.id));
+  if (i) abrirItem(i);
+}
+async function renomearSelecionada() {
+  const i = dadosPasta.itens.find(x => selDrive.has(x.id));
+  if (!i) return;
+  const nome = prompt("Novo nome:", i.nome);
+  if (!nome || !nome.trim() || nome.trim() === i.nome) return;
+  try { await api(`/api/pastas/${i.id}/renomear`, {nome: nome.trim()}); i.nome = nome.trim(); desenharPasta(); aviso("Renomeado"); }
+  catch (e) { aviso(e.message, true); }
+}
+async function lixeiraSelecionadas() {
+  const itens = dadosPasta.itens.filter(i => selDrive.has(i.id));
+  if (!itens.length) return;
+  const nomes = itens.length === 1 ? `"${itens[0].nome}"` : `${itens.length} itens`;
+  if (!confirm(`Mover ${nomes} para a lixeira do Drive?\n(Dá para recuperar pela lixeira do Google Drive por 30 dias.)`)) return;
+  try {
+    await api("/api/pastas/lixeira", {ids: itens.map(i => i.id)});
+    dadosPasta.itens = dadosPasta.itens.filter(i => !selDrive.has(i.id));
+    itens.forEach(i => delete cachePastas[chaveCache(i.id)]);
+    selDrive.clear(); desenharPasta();
+    aviso(`${nomes} na lixeira`);
+  } catch (e) { aviso(e.message, true); }
+}
+document.addEventListener("click", e => {
+  const el = e.target.closest && e.target.closest("#driveGrade .item-drive");
+  if (!el) return;
+  const n = +el.dataset.n, id = dadosPasta.itens[n].id;
+  if (e.shiftKey && ultimoSel !== null) {
+    const [a, b] = [ultimoSel, n].sort((x, y) => x - y);
+    for (let k = a; k <= b; k++) selDrive.add(dadosPasta.itens[k].id);
+  } else if (e.ctrlKey || e.metaKey) {
+    selDrive.has(id) ? selDrive.delete(id) : selDrive.add(id);
+  } else {
+    selDrive = new Set([id]);
+  }
+  ultimoSel = n;
+  mostrarSelecao();
+});
+document.addEventListener("dblclick", e => {
+  const el = e.target.closest && e.target.closest("#driveGrade .item-drive");
+  if (el) abrirItem(dadosPasta.itens[+el.dataset.n]);
+});
+document.addEventListener("keydown", e => {
+  if ($("telaDrive").style.display === "none" || !dadosPasta) return;
+  if (["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
+  if (e.key === "Delete" && selDrive.size) { lixeiraSelecionadas(); e.preventDefault(); }
+  if (e.key === "Enter" && selDrive.size === 1) { abrirSelecionada(); e.preventDefault(); }
+  if (e.key === "Escape") limparSelecao();
+  if (e.key === "Backspace" && dadosPasta.caminho.length > 1) abrirPasta(dadosPasta.caminho[dadosPasta.caminho.length - 2].id);
+  if ((e.ctrlKey || e.metaKey) && (e.key === "a" || e.key === "A")) {
+    dadosPasta.itens.forEach(i => selDrive.add(i.id)); mostrarSelecao(); e.preventDefault();
+  }
+});
 function mostrarPainelPasta() {
   const d = dadosPasta;
   const ehRaiz = d.pasta.id === d.raiz || d.meu_drive;
@@ -1367,8 +1465,7 @@ async function enviarParaPasta() {
       tamanho: $("ppTamanho").value, permitir_download: $("ppDownload").checked});
     mostrarEnvioPasta.feito = false;
     aviso("Enviando… pode continuar usando o programa");
-    dadosPasta = await api("/api/pastas?id=" + encodeURIComponent(dadosPasta.pasta.id)).then(d => ({...d,
-      pasta_link: "https://drive.google.com/drive/folders/" + d.pasta.id}));
+    dadosPasta = await buscarPasta(dadosPasta.pasta.id);
     acompanharEnvio();
   } catch (e) { aviso(e.message, true); }
 }

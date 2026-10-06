@@ -15,7 +15,9 @@ import json
 import logging
 import mimetypes
 import os
+import http.client as http_client
 import secrets
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -39,9 +41,58 @@ class ErroDrive(Exception):
     pass
 
 
+_conexoes = threading.local()
+
+
 def http(metodo: str, url: str, cabecalhos: dict | None = None, corpo: bytes | None = None,
          tempo: float = 120) -> tuple[int, dict, bytes]:
-    """Faz uma requisição HTTP. Trocado por um falso nos testes."""
+    """Faz uma requisição HTTP. Trocado por um falso nos testes.
+
+    Reaproveita a conexão com o Google (abrir uma conexão segura nova leva ~0,2 s por chamada,
+    e a aba Drive faz várias por clique). Se algo der errado, cai no jeito simples (urllib).
+    """
+    partes = urllib.parse.urlsplit(url)
+    if partes.scheme == "https" and not urllib.request.getproxies().get("https"):
+        try:
+            return _http_mantido(metodo, partes, cabecalhos or {}, corpo, tempo)
+        except _Redirecionar:
+            pass
+        except (OSError, http_client.HTTPException) as erro:
+            log.debug("conexão mantida falhou (%s), usando urllib", erro)
+    return _http_simples(metodo, url, cabecalhos, corpo, tempo)
+
+
+class _Redirecionar(Exception):
+    pass
+
+
+def _http_mantido(metodo, partes, cabecalhos, corpo, tempo):
+    abertas = getattr(_conexoes, "abertas", None)
+    if abertas is None:
+        abertas = _conexoes.abertas = {}
+    caminho = partes.path + ("?" + partes.query if partes.query else "")
+    for tentativa in range(2):
+        conexao = abertas.get(partes.netloc)
+        if conexao is None:
+            conexao = abertas[partes.netloc] = http_client.HTTPSConnection(partes.netloc, timeout=tempo)
+        conexao.timeout = tempo
+        try:
+            conexao.request(metodo, caminho, body=corpo, headers=cabecalhos)
+            resp = conexao.getresponse()
+            dados = resp.read()
+        except (OSError, http_client.HTTPException):
+            conexao.close()
+            abertas.pop(partes.netloc, None)
+            if tentativa:
+                raise
+            continue   # conexão velha fechada pelo Google: abre outra e tenta de novo
+        if resp.status in (301, 302, 303, 307) and resp.getheader("Location"):
+            raise _Redirecionar()
+        return resp.status, dict(resp.getheaders()), dados
+    raise OSError("sem conexão")
+
+
+def _http_simples(metodo, url, cabecalhos, corpo, tempo):
     req = urllib.request.Request(url, data=corpo, method=metodo, headers=cabecalhos or {})
     try:
         with urllib.request.urlopen(req, timeout=tempo) as resp:
@@ -102,6 +153,9 @@ class Login:
 
 
 # ---------------------------------------------------------------- operações
+
+_info_cache: dict = {}
+
 
 class Drive:
     def __init__(self, cliente: dict, token: dict, ao_renovar=None):
@@ -216,8 +270,17 @@ class Drive:
                 return itens
 
     def info(self, arquivo_id: str) -> dict:
-        return self._json("GET", f"{API}/files/{arquivo_id}?fields=id,name,mimeType,parents,webViewLink,"
-                                 "ownedByMe&supportsAllDrives=true")
+        guardado = _info_cache.get(arquivo_id)
+        if guardado and time.time() - guardado[0] < 300:   # nome/pasta de cima mudam pouco
+            return guardado[1]
+        dados = self._json("GET", f"{API}/files/{arquivo_id}?fields=id,name,mimeType,parents,webViewLink,"
+                                  "ownedByMe&supportsAllDrives=true")
+        _info_cache[arquivo_id] = (time.time(), dados)
+        return dados
+
+    @staticmethod
+    def esquecer(arquivo_id: str):
+        _info_cache.pop(arquivo_id, None)
 
     def caminho(self, pasta_id: str, ate: str | None = None, limite: int = 12) -> list[dict]:
         """[{id, name}, ...] da pasta de cima até esta (para o "você está em")."""
@@ -248,6 +311,7 @@ class Drive:
 
     def renomear(self, arquivo_id: str, nome: str):
         self._json("PATCH", f"{API}/files/{arquivo_id}", {"name": nome})
+        self.esquecer(arquivo_id)
 
     def baixar_miniatura(self, url: str) -> tuple[bytes, str]:
         status, cab, dados = self._chamar("GET", url)

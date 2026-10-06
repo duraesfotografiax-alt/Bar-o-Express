@@ -16,6 +16,11 @@ Programa de PC para **entregar fotos e vídeos aos clientes pelo Google Drive**,
    - **Álbum**: libera a seleção de fotos para o cliente (veja "Seleção do álbum");
    - Abrir no Google Drive, renomear, usar como pasta principal da empresa, mover para a lixeira.
 
+   **Selecionar:** um clique seleciona, **dois cliques abrem** (pasta) ou mostram no Drive (foto/vídeo).
+   **Ctrl** ou **Shift** selecionam vários, **Ctrl+A** todos. Com itens selecionados aparecem
+   **Abrir**, **Renomear** e **Mover para a lixeira** (ou tecla **Delete**). **Backspace** volta uma
+   pasta. Pastas já vistas abrem na hora, e passar o mouse numa pasta já começa a carregá-la.
+
    **Trocar a pasta principal:** no caminho em cima da lista, clique em **Meu Drive**, abra a pasta
    que quer usar (ex.: a pasta de entregas que vocês já têm) e clique em **Usar como pasta
    principal**. Faça isso com a Durães e com a Elite (cada uma tem a sua).
