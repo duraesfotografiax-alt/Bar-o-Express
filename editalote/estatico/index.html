@@ -124,6 +124,13 @@
     <div class="drive-barra">
       <nav class="trilha" id="trilha"></nav>
       <span style="margin-left:auto"></span>
+      <input type="search" id="buscaDrive" class="busca-drive" placeholder="🔍 Buscar pasta ou foto" oninput="desenharPasta()">
+      <select id="ordemDrive" onchange="mudarOrdem()" title="Ordem">
+        <option value="nome">Nome (A → Z)</option>
+        <option value="nome_desc">Nome (Z → A)</option>
+        <option value="recentes">Modificadas: mais recentes</option>
+        <option value="antigas">Modificadas: mais antigas</option>
+      </select>
       <button onclick="novaPasta()">＋ Nova pasta</button>
       <button class="fantasma" onclick="abrirPasta(dadosPasta && dadosPasta.pasta.id)" title="Atualizar">↻</button>
     </div>

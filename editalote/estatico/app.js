@@ -1277,6 +1277,7 @@ async function buscarPasta(id) {
 async function abrirPasta(id) {
   const meu = ++pedidoPasta;
   selDrive.clear(); ultimoSel = null;
+  if ($("buscaDrive")) $("buscaDrive").value = "";
   const guardada = cachePastas[chaveCache(id)];
   if (guardada) { dadosPasta = guardada; desenharPasta(); $("driveInfo").textContent += "  ·  atualizando…"; }
   else { $("driveInfo").textContent = "Carregando…"; $("driveGrade").style.opacity = .45; }
@@ -1295,8 +1296,39 @@ function preverPasta(id) {
   if (cachePastas[chaveCache(id)]) return;
   timerPrevisao = setTimeout(() => buscarPasta(id).catch(() => {}), 180);
 }
+// ordem e busca (só na tela; as pastas vêm sempre antes dos arquivos)
+let ordemDrive = "nome";
+try { ordemDrive = localStorage.getItem("duraes_ordem") || "nome"; } catch (e) {}
+const comparaNome = new Intl.Collator("pt-BR", {numeric: true, sensitivity: "base"});
+function mudarOrdem() {
+  ordemDrive = $("ordemDrive").value;
+  try { localStorage.setItem("duraes_ordem", ordemDrive); } catch (e) {}
+  desenharPasta();
+}
+function indicesVisiveis() {
+  const busca = ($("buscaDrive").value || "").trim().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const itens = dadosPasta.itens;
+  const idx = itens.map((_, n) => n).filter(n => !busca ||
+    itens[n].nome.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(busca));
+  const data = n => itens[n].modificado || "";
+  const cmp = {
+    nome: (a, b) => comparaNome.compare(itens[a].nome, itens[b].nome),
+    nome_desc: (a, b) => comparaNome.compare(itens[b].nome, itens[a].nome),
+    recentes: (a, b) => data(b).localeCompare(data(a)),
+    antigas: (a, b) => data(a).localeCompare(data(b)),
+  }[ordemDrive] || (() => 0);
+  return idx.sort((a, b) => (itens[b].pasta - itens[a].pasta) || cmp(a, b));
+}
+function dataCurta(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleDateString("pt-BR", {day: "2-digit", month: "2-digit", year: "numeric"});
+}
 function desenharPasta() {
   const d = dadosPasta;
+  if (!d) return;
+  $("ordemDrive").value = ordemDrive;
   $("trilha").innerHTML = d.caminho.map((c, i) => i === d.caminho.length - 1
     ? `<b>${esc(c.name)}</b>` : `<a href="#" onclick="abrirPasta('${c.id}'); return false">${esc(c.name)}</a>`).join(" › ");
   const pastas = d.itens.filter(i => i.pasta), arquivos = d.itens.filter(i => !i.pasta);
@@ -1304,10 +1336,14 @@ function desenharPasta() {
   $("driveInfo").textContent = [pastas.length && `${pastas.length} pasta${pastas.length > 1 ? "s" : ""}`,
     fotos && `${fotos} foto${fotos > 1 ? "s" : ""}`, videos && `${videos} vídeo${videos > 1 ? "s" : ""}`]
     .filter(Boolean).join(" · ") || "Pasta vazia. Crie uma pasta para o cliente ou envie fotos e vídeos para cá.";
-  $("driveGrade").innerHTML = d.itens.map((i, n) => i.pasta
+  const visiveis = indicesVisiveis();
+  if (($("buscaDrive").value || "").trim())
+    $("driveInfo").textContent = `${visiveis.length} de ${d.itens.length} itens com "${$("buscaDrive").value.trim()}"`;
+  $("driveGrade").innerHTML = visiveis.map(n => [d.itens[n], n]).map(([i, n]) => i.pasta
     ? `<div class="item-drive pasta${selDrive.has(i.id) ? " sel" : ""}" data-n="${n}" onmouseenter="preverPasta('${i.id}')"
         title="${esc(i.nome)} — dois cliques para abrir">
-        <i class="marca-sel">✓</i><div class="icone-pasta">📁</div><span>${esc(i.nome)}</span></div>`
+        <i class="marca-sel">✓</i><div class="icone-pasta">📁</div>
+        <div class="nome-pasta"><span>${esc(i.nome)}</span><small>${dataCurta(i.modificado)}</small></div></div>`
     : `<div class="item-drive${selDrive.has(i.id) ? " sel" : ""}" data-n="${n}" title="${esc(i.nome)} — dois cliques para ver no Drive">
         <i class="marca-sel">✓</i>
         ${i.miniatura ? `<img loading="lazy" src="/api/pastas/miniatura/${i.id}?t=400">` : `<div class="icone-pasta">${i.video ? "🎬" : "📄"}</div>`}
@@ -1358,8 +1394,9 @@ document.addEventListener("click", e => {
   if (!el) return;
   const n = +el.dataset.n, id = dadosPasta.itens[n].id;
   if (e.shiftKey && ultimoSel !== null) {
-    const [a, b] = [ultimoSel, n].sort((x, y) => x - y);
-    for (let k = a; k <= b; k++) selDrive.add(dadosPasta.itens[k].id);
+    const ordem = indicesVisiveis();   // intervalo na ordem que aparece na tela
+    const [a, b] = [ordem.indexOf(ultimoSel), ordem.indexOf(n)].sort((x, y) => x - y);
+    for (let k = Math.max(a, 0); k <= b; k++) selDrive.add(dadosPasta.itens[ordem[k]].id);
   } else if (e.ctrlKey || e.metaKey) {
     selDrive.has(id) ? selDrive.delete(id) : selDrive.add(id);
   } else {
@@ -1380,7 +1417,7 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape") limparSelecao();
   if (e.key === "Backspace" && dadosPasta.caminho.length > 1) abrirPasta(dadosPasta.caminho[dadosPasta.caminho.length - 2].id);
   if ((e.ctrlKey || e.metaKey) && (e.key === "a" || e.key === "A")) {
-    dadosPasta.itens.forEach(i => selDrive.add(i.id)); mostrarSelecao(); e.preventDefault();
+    indicesVisiveis().forEach(n => selDrive.add(dadosPasta.itens[n].id)); mostrarSelecao(); e.preventDefault();
   }
 });
 function mostrarPainelPasta() {

@@ -405,3 +405,7 @@ button.perigo { color: var(--erro); }
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .item-drive.pasta .marca-sel { top: 50%; transform: translateY(-50%); right: 8px; }
 .drive-grade:has(.item-drive.pasta) { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.busca-drive { width: 210px; }
+#ordemDrive { width: auto; }
+.item-drive.pasta .nome-pasta { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+.item-drive.pasta .nome-pasta small { color: var(--fraco); font-size: 11px; }

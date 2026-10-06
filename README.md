@@ -21,6 +21,11 @@ Programa de PC para **entregar fotos e vídeos aos clientes pelo Google Drive**,
    **Abrir**, **Renomear** e **Mover para a lixeira** (ou tecla **Delete**). **Backspace** volta uma
    pasta. Pastas já vistas abrem na hora, e passar o mouse numa pasta já começa a carregá-la.
 
+   **Ordem e busca:** em cima da lista, escolha **Nome (A → Z)**, **Nome (Z → A)**, **Modificadas:
+   mais recentes** ou **mais antigas** (o programa lembra a escolha). A caixa **Buscar** filtra pelo
+   nome na pasta aberta (sem diferença de acento ou maiúscula). Cada pasta mostra a data da última
+   modificação.
+
    **Trocar a pasta principal:** no caminho em cima da lista, clique em **Meu Drive**, abra a pasta
    que quer usar (ex.: a pasta de entregas que vocês já têm) e clique em **Usar como pasta
    principal**. Faça isso com a Durães e com a Elite (cada uma tem a sua).
