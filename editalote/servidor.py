@@ -432,15 +432,18 @@ def pastas_listar():
         empresa = _empresa()
         raiz = projetos._pasta_raiz(drive, empresa)
         pasta = request.args.get("id") or raiz
+        meu_drive = pasta == "root"
         itens = drive.itens(pasta)
         for i in itens:
             if i.get("thumbnailLink"):
                 _miniaturas[i["id"]] = i["thumbnailLink"]
-        caminho = drive.caminho(pasta, ate=raiz)
-        projeto = projetos.projeto_da_pasta(pasta)
+        caminho = [{"id": "root", "name": "Meu Drive"}] if meu_drive else drive.caminho(pasta)
+        if caminho and caminho[0]["id"] != "root" and caminho[0].get("name") in ("Meu Drive", "My Drive"):
+            caminho[0] = {"id": "root", "name": "Meu Drive"}
+        projeto = None if meu_drive else projetos.projeto_da_pasta(pasta)
         return jsonify({"pasta": caminho[-1] if caminho else {"id": pasta, "name": ""}, "caminho": caminho,
-                        "raiz": raiz, "itens": [_item(i) for i in itens],
-                        "link": drive.link_publico(pasta) if pasta != raiz else None,
+                        "raiz": raiz, "meu_drive": meu_drive, "itens": [_item(i) for i in itens],
+                        "link": drive.link_publico(pasta) if pasta not in (raiz, "root") else None,
                         "projeto": projeto, "link_album": projetos.link_album(projeto) if projeto else ""})
     except ErroDrive as erro:
         return _erro(erro)

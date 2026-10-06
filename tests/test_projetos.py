@@ -96,6 +96,8 @@ class DriveFalso:
             self.permissoes.setdefault(partes[4], []).append(json.loads(corpo))
             return 200, {}, b'{"id":"p1"}'
         fid = partes[4]
+        if fid == "root" and metodo == "GET":
+            return 200, {}, json.dumps({"id": "raiz-meu-drive", "name": "Meu Drive", "parents": []}).encode()
         if fid not in self.arquivos:
             return 404, {}, b"{}"
         if metodo == "GET":
@@ -362,3 +364,19 @@ def test_rotas_da_aba_drive(ambiente, monkeypatch):
     assert c.delete(f"/api/pastas/{raiz}?empresa=elite").status_code == 400      # a principal não
     assert c.get("/api/projetos?empresa=elite").get_json()[0]["nome"] == "Cliente Novo"
     assert c.get("/api/projetos?empresa=duraes").get_json() == []
+
+
+def test_meu_drive_e_trocar_pasta_principal(ambiente, monkeypatch):
+    from editalote import servidor
+
+    pj, falso, fotos = ambiente
+    monkeypatch.setattr(servidor, "projetos", pj)
+    c = servidor.app.test_client()
+    antiga = pj.drive().criar_pasta("DURÃES 2026", None)        # pasta que já existia no Drive
+    falso.arquivos[antiga]["parents"] = ["root"]
+    r = c.get("/api/pastas?empresa=duraes&id=root").get_json()
+    assert r["meu_drive"] and r["link"] is None and r["caminho"] == [{"id": "root", "name": "Meu Drive"}]
+    assert "DURÃES 2026" in [i["nome"] for i in r["itens"]]
+    assert c.post(f"/api/pastas/{antiga}/principal", json={"empresa": "duraes"}).status_code == 200
+    r = c.get("/api/pastas?empresa=duraes").get_json()
+    assert r["raiz"] == antiga and r["pasta"]["name"] == "DURÃES 2026"

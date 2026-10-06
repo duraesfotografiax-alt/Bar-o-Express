@@ -1269,6 +1269,7 @@ async function abrirPasta(id) {
   catch (e) { $("driveInfo").innerHTML = `<span class="erro">${esc(e.message)}</span>`; return; }
   const d = dadosPasta;
   d.pasta_link = "https://drive.google.com/drive/folders/" + d.pasta.id;
+  if (d.caminho[0] && d.caminho[0].id !== "root") d.caminho.unshift({id: "root", name: "Meu Drive"});
   $("trilha").innerHTML = d.caminho.map((c, i) => i === d.caminho.length - 1
     ? `<b>${esc(c.name)}</b>` : `<a href="#" onclick="abrirPasta('${c.id}'); return false">${esc(c.name)}</a>`).join(" › ");
   const pastas = d.itens.filter(i => i.pasta), arquivos = d.itens.filter(i => !i.pasta);
@@ -1286,10 +1287,11 @@ async function abrirPasta(id) {
 }
 function mostrarPainelPasta() {
   const d = dadosPasta;
-  const ehRaiz = d.pasta.id === d.raiz;
+  const ehRaiz = d.pasta.id === d.raiz || d.meu_drive;
   $("painelPasta").style.display = "";
   $("ppNome").textContent = d.pasta.name;
-  $("ppResumo").textContent = ehRaiz ? `Pasta principal da ${NOMES_EMPRESA[empresa]}. Crie uma pasta para cada cliente.`
+  $("ppResumo").textContent = d.meu_drive ? "Todo o seu Drive. Abra a pasta que quer usar como principal."
+    : ehRaiz ? `Pasta principal da ${NOMES_EMPRESA[empresa]}. Crie uma pasta para cada cliente.`
     : $("driveInfo").textContent;
   $("ppSemLink").style.display = d.link ? "none" : "";
   $("ppComLink").style.display = d.link ? "" : "none";
@@ -1299,6 +1301,7 @@ function mostrarPainelPasta() {
   $("ppLimite").value = (d.projeto && d.projeto.album_limite) || "";
   $("ppAlbum").style.display = d.link_album ? "" : "none";
   $("ppPrincipal").style.display = ehRaiz ? "none" : "";
+  $("ppPrincipal").textContent = `Usar como pasta principal da ${empresa === "elite" ? "Elite" : "Durães"}`;
   $("ppCliente").style.display = ehRaiz ? "none" : "";
   mostrarEnvioPasta();
 }
