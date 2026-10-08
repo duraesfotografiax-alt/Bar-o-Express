@@ -2,7 +2,7 @@ import { DESAFIOS, DESAFIOS_ANTIGOS, PREMIOS, RALLY, LEMBRETE_HORA, VAPID_PUBLIC
 import { store, hoje, normalizarUsuario } from "./store.js";
 import { ICONES } from "./icons.js";
 
-const VERSAO_APP = "versão 7";
+const VERSAO_APP = "versão 8";
 const $app = document.getElementById("app");
 const $toast = document.getElementById("toast");
 
@@ -261,7 +261,7 @@ function telaDesafios() {
           <span class="num">${i + 1}</span>
           <span class="ic">${ICONES[d.icone] || ICONES.alvo}</span>
           <span class="nome">${esc(d.titulo)}</span>
-          <span class="pts">${d.pontos} pontos</span>
+          <span class="pts">${r?.quantidade ? `${r.quantidade}× = ${r.pontos} pts` : d.porQuantidade ? `${d.pontos} pts cada` : `${d.pontos} pontos`}</span>
           ${r?.status === "ok" ? `<span class="selo">${ICONES.check}</span>` : ""}
           ${r?.status === "rejeitado" ? `<span class="tag vermelha" style="margin-top:8px">Não validado</span>` : ""}
         </button>`;
@@ -322,7 +322,7 @@ function listaRegistros(registros, { admin = false, mostrarNome = false } = {}) 
           <div class="item ${rej ? "riscado" : ""}">
             <span class="pos" style="color:var(--laranja)">${ICONES[d.icone] || ICONES.alvo}</span>
             <span class="info">
-              <strong>${esc(d.titulo)}</strong>
+              <strong>${esc(d.titulo)}${r.quantidade > 1 ? ` <span class="qtd">×${r.quantidade}</span>` : ""}</strong>
               <small>${mostrarNome ? `${esc(r.nome)} · ` : ""}${new Date(r.criadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</small>
               ${rej ? ` <span class="tag vermelha">Não validado</span>` : ""}
             </span>
@@ -502,6 +502,7 @@ function telaAjustes() {
             <input class="ed-titulo" id="aj-titulo-${i}" data-campo="titulo" data-i="${i}" value="${esc(d.titulo)}" maxlength="60" aria-label="Nome do desafio" />
             <label class="ed-pontos"><input id="aj-pontos-${i}" type="number" inputmode="numeric" min="1" max="${MAX_PONTOS}" data-campo="pontos" data-i="${i}" value="${d.pontos}" aria-label="Pontos" /><span>pts</span></label>
             <button class="acao perigo" data-acao="tirar-desafio" data-i="${i}">Tirar</button>
+            <label class="ed-qtd"><input type="checkbox" id="aj-qtd-${i}" data-campo="porQuantidade" data-i="${i}" ${d.porQuantidade ? "checked" : ""} /> Por quantidade (pontos × quantos a pessoa fez)</label>
           </div>`).join("") || `<div class="vazio">Nenhum desafio. Adicione pelo menos um.</div>`}
       </div>
       <button class="botao secundario" data-acao="novo-desafio">+ Adicionar desafio</button>
@@ -573,7 +574,7 @@ async function salvarAjustes() {
   const antigos = [...cfg().antigos.filter((a) => !atuais.has(a.id))];
   for (const d of cfg().desafios) if (!atuais.has(d.id) && !antigos.some((a) => a.id === d.id)) antigos.push({ id: d.id, titulo: d.titulo, icone: d.icone });
   const final = {
-    desafios: c.desafios.map(({ id, titulo, pontos, icone }) => ({ id, titulo, pontos, icone })),
+    desafios: c.desafios.map(({ id, titulo, pontos, icone, porQuantidade }) => ({ id, titulo, pontos, icone, ...(porQuantidade ? { porQuantidade: true } : {}) })),
     antigos,
     inicio: c.inicio,
     fim: c.fim,
@@ -706,6 +707,48 @@ function abrirFolha({ icone, titulo, texto, confirmar, perigo = false, cancelar 
   });
 }
 
+// Desafio por quantidade: a pessoa diz quantos fez (ex.: pacotes levados) e os pontos multiplicam.
+function escolherQuantidade(d) {
+  const max = Math.max(1, Math.floor(MAX_PONTOS / d.pontos));
+  return new Promise((resolve) => {
+    let qtd = 1;
+    const fundo = document.createElement("div");
+    fundo.className = "fundo-modal";
+    fundo.innerHTML = `
+      <div class="folha" role="dialog" aria-modal="true">
+        <div class="puxador"></div>
+        <div class="ic-grande">${ICONES[d.icone] || ICONES.alvo}</div>
+        <h3>${esc(d.titulo)}</h3>
+        <p>Quantos você fez hoje? Cada um vale <b>${d.pontos} pontos</b>.</p>
+        <div class="passo-qtd">
+          <button class="botao secundario" data-q="-1" aria-label="Menos">−</button>
+          <output id="qtd-valor">1</output>
+          <button class="botao secundario" data-q="1" aria-label="Mais">+</button>
+        </div>
+        <p class="total-qtd">Total: <b id="qtd-total" style="color:var(--laranja)">+${d.pontos} pontos</b></p>
+        <div class="botoes">
+          <button class="botao" data-r="1">Sim, eu fiz!</button>
+          <button class="botao secundario" data-r="0">Cancelar</button>
+        </div>
+      </div>`;
+    const fechar = (v) => { fundo.remove(); resolve(v); };
+    fundo.addEventListener("click", (e) => {
+      if (e.target === fundo) return fechar(0);
+      const q = e.target.closest("[data-q]");
+      if (q) {
+        qtd = Math.min(max, Math.max(1, qtd + Number(q.dataset.q)));
+        fundo.querySelector("#qtd-valor").textContent = qtd;
+        fundo.querySelector("#qtd-total").textContent = `+${d.pontos * qtd} pontos`;
+        if (qtd === max && Number(q.dataset.q) > 0) toast(`Máximo de ${max} por dia.`);
+        return;
+      }
+      const b = e.target.closest("[data-r]");
+      if (b) fechar(b.dataset.r === "1" ? qtd : 0);
+    });
+    document.body.appendChild(fundo);
+  });
+}
+
 async function tocarDesafio(id, el) {
   const d = desafio(id);
   const r = estado.registros.find((x) => x.uid === estado.usuario.uid && x.data === hoje() && x.desafioId === id);
@@ -713,20 +756,26 @@ async function tocarDesafio(id, el) {
     return abrirFolha({ icone: d.icone, titulo: d.titulo, texto: "O administrador não validou este registro hoje. Fale com ele se achar que foi um engano.", cancelar: "Entendi" });
   }
   if (r) {
-    const ok = await abrirFolha({ icone: d.icone, titulo: "Desfazer?", texto: `Você marcou <b>${esc(d.titulo)}</b> hoje. Quer desmarcar e tirar os ${d.pontos} pontos?`, confirmar: "Desmarcar", perigo: true });
+    const ok = await abrirFolha({ icone: d.icone, titulo: "Desfazer?", texto: `Você marcou <b>${esc(d.titulo)}</b> hoje. Quer desmarcar e tirar os ${r.pontos} pontos?`, confirmar: "Desmarcar", perigo: true });
     if (!ok) return;
     try { await store.desmarcar(r.id); await carregar(); render(); toast("Desafio desmarcado."); }
     catch (e) { toast(e.message, true); }
     return;
   }
-  const ok = await abrirFolha({ icone: d.icone, titulo: d.titulo, texto: `Confirma que você cumpriu este desafio hoje? <b style="color:var(--laranja)">+${d.pontos} pontos</b>`, confirmar: "Sim, eu fiz!" });
-  if (!ok) return;
+  let quantidade = 1;
+  if (d.porQuantidade) {
+    quantidade = await escolherQuantidade(d);
+    if (!quantidade) return;
+  } else {
+    const ok = await abrirFolha({ icone: d.icone, titulo: d.titulo, texto: `Confirma que você cumpriu este desafio hoje? <b style="color:var(--laranja)">+${d.pontos} pontos</b>`, confirmar: "Sim, eu fiz!" });
+    if (!ok) return;
+  }
   const rect = el.getBoundingClientRect();
   try {
-    await store.marcar(estado.usuario, d);
+    await store.marcar(estado.usuario, d, quantidade);
     await carregar();
     render();
-    comemorar(rect.left + rect.width / 2, rect.top + rect.height / 2, d.pontos);
+    comemorar(rect.left + rect.width / 2, rect.top + rect.height / 2, d.pontos * quantidade);
   } catch (e) { toast(e.message, true); }
 }
 
@@ -868,7 +917,8 @@ $app.addEventListener("input", (e) => {
   const { campo, i } = e.target.dataset;
   if (campo && estado.rascunho) {
     const r = estado.rascunho, v = e.target.value;
-    if (campo === "titulo") r.desafios[i].titulo = v;
+    if (campo === "porQuantidade") r.desafios[i].porQuantidade = e.target.checked;
+    else if (campo === "titulo") r.desafios[i].titulo = v;
     else if (campo === "pontos") r.desafios[i].pontos = Math.round(Number(v));
     else if (campo === "premio") r.premios[i] = v;
     else if (campo === "lembreteHora") r.lembreteHora = v === "" ? null : Number(v);

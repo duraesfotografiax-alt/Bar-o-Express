@@ -273,3 +273,13 @@ img { max-width: 100%; display: block; }
 .item.correcao .pos { color: var(--laranja); }
 .item.correcao.negativa { border-color: rgba(229, 57, 53, 0.5); }
 .item.correcao.negativa .valor, .item.correcao.negativa .pos { color: #ff6b6b; }
+
+/* Desafio por quantidade */
+.edita-desafio { grid-template-areas: "ic titulo titulo" "ic pontos tirar" "ic qtd qtd"; }
+.ed-qtd { grid-area: qtd; display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--cinza); line-height: 1.3; }
+.ed-qtd input { width: 18px; height: 18px; accent-color: var(--laranja); flex: none; }
+.passo-qtd { display: grid; grid-template-columns: 64px 1fr 64px; align-items: center; gap: 12px; margin: 0 auto 8px; max-width: 260px; }
+.passo-qtd .botao { padding: 12px 0; font-size: 1.6rem; line-height: 1; }
+.passo-qtd output { font-size: 2.6rem; font-weight: 900; color: var(--branco); font-variant-numeric: tabular-nums; }
+.folha .total-qtd { margin-bottom: 18px; }
+.qtd { color: var(--laranja); font-weight: 900; }

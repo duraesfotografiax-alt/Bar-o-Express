@@ -74,14 +74,14 @@ function criarStoreLocal() {
       const todos = ler("uf_registros", []);
       return uid ? todos.filter((r) => r.uid === uid) : todos;
     },
-    async marcar(usuario, d) {
+    async marcar(usuario, d, quantidade = 1) {
       const data = hoje();
       const id = idRegistro(usuario.uid, data, d.id);
       const todos = ler("uf_registros", []);
       if (todos.some((r) => r.id === id)) throw new Error("Você já marcou esse desafio hoje.");
       todos.push({
         id, uid: usuario.uid, nome: usuario.nome, desafioId: d.id,
-        pontos: d.pontos, data, status: "ok", criadoEm: Date.now(),
+        pontos: d.pontos * quantidade, ...(d.porQuantidade ? { quantidade } : {}), data, status: "ok", criadoEm: Date.now(),
       });
       gravar("uf_registros", todos);
     },
@@ -189,12 +189,12 @@ function criarStoreFirebase() {
         return { id: d.id, ...r, criadoEm: r.criadoEm?.toMillis?.() ?? Date.now() };
       });
     },
-    async marcar(usuario, d) {
+    async marcar(usuario, d, quantidade = 1) {
       const data = hoje();
       await tentar(() =>
         fb.setDoc(fb.doc(db, "registros", idRegistro(usuario.uid, data, d.id)), {
           uid: usuario.uid, nome: usuario.nome, desafioId: d.id,
-          pontos: d.pontos, data, status: "ok",
+          pontos: d.pontos * quantidade, ...(d.porQuantidade ? { quantidade } : {}), data, status: "ok",
           criadoEm: fb.serverTimestamp(),
         })
       );
