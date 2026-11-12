@@ -179,7 +179,8 @@ h3 { font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap:
 .linha { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--linha); width: 100%; }
 .lista > .linha:last-of-type { border-bottom: 0; }
 .linha-meio { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.titulo { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.titulo { font-weight: 700; overflow-wrap: anywhere; }
+.titulo em { white-space: nowrap; }
 .titulo em { font-style: normal; font-size: 0.75rem; font-weight: 700; color: var(--cinza); background: var(--campo); border: 1px solid var(--linha); padding: 1px 6px; border-radius: 6px; margin-left: 4px; }
 .sub { font-size: 0.8rem; color: var(--cinza); }
 .valor { font-weight: 800; white-space: nowrap; }
