@@ -1,0 +1,59 @@
+rules_version = '2';
+
+// Regras de segurança — Nossas Contas
+// Cada casal tem um "espaço" (casas/{id}). Só quem está na lista de membros
+// consegue ver ou mexer nas entradas, contas, cartões e pagamentos dele.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function logado() { return request.auth != null; }
+    function eu() { return request.auth.uid; }
+    function casa(id) { return get(/databases/$(database)/documents/casas/$(id)).data; }
+    function membro(id) { return logado() && eu() in casa(id).membros; }
+
+    // Perfil de cada pessoa: só ela mesma lê e altera.
+    match /usuarios/{uid} {
+      allow read, write: if logado() && eu() == uid;
+    }
+
+    // Código de convite → id do espaço. Dá para consultar um código que você
+    // já sabe, mas não dá para listar todos.
+    match /convites/{codigo} {
+      allow get: if logado();
+      allow create: if logado()
+        && getAfter(/databases/$(database)/documents/casas/$(request.resource.data.casaId)).data.codigo == codigo
+        && getAfter(/databases/$(database)/documents/casas/$(request.resource.data.casaId)).data.criadoPor == eu();
+    }
+
+    match /casas/{casaId} {
+      allow get: if logado() && eu() in resource.data.membros;
+
+      allow create: if logado()
+        && request.resource.data.criadoPor == eu()
+        && request.resource.data.membros == [eu()];
+
+      // Quem já é do espaço pode mudar os ajustes, mas não a lista de membros nem o código.
+      allow update: if logado() && eu() in resource.data.membros
+        && request.resource.data.membros == resource.data.membros
+        && request.resource.data.codigo == resource.data.codigo;
+
+      // Entrar com o código: só se adiciona a si mesmo (até 4 pessoas) e o próprio nome.
+      allow update: if logado() && !(eu() in resource.data.membros)
+        && resource.data.membros.size() < 4
+        && request.resource.data.membros == resource.data.membros.concat([eu()])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['membros', 'nomes'])
+        && request.resource.data.nomes.diff(resource.data.nomes).affectedKeys().hasOnly([eu()]);
+
+      match /itens/{id} {
+        allow read, delete: if membro(casaId);
+        allow create, update: if membro(casaId)
+          && request.resource.data.tipo in ['entrada', 'renda', 'conta', 'divida', 'cartao', 'compra', 'gasto', 'reserva'];
+      }
+      match /pagamentos/{id} {
+        allow read, delete: if membro(casaId);
+        allow create, update: if membro(casaId)
+          && request.resource.data.valor is int
+          && id == request.resource.data.refId + '_' + request.resource.data.mes;
+      }
+    }
+  }
+}
